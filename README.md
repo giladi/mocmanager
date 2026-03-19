@@ -1,12 +1,13 @@
-# LEGO MOC Manager Starter
+# LEGO MOC Manager Starter v2
 
-This is a starter version of your LEGO MOC Manager rebuilt as a real web app:
+This version adds:
+- Rebrickable CSV importer
+- Import preview before saving
+- MOC title override before import
+- Optional MOC URL before import
+- Spare-row skipping
 
-- React frontend
-- Supabase database + auth
-- Ready to deploy on Cloudflare Pages
-
-## 1. Create the app locally
+## Setup
 
 ```bash
 npm install
@@ -16,66 +17,33 @@ npm run dev
 
 Then fill in your Supabase values in `.env`.
 
-## 2. Create a Supabase project
+## Supabase
 
-In Supabase:
-- create a new project
-- open SQL Editor
-- run `supabase/schema.sql`
-- in Authentication, enable Email login
-- copy your project URL and anon key into `.env`
+1. Create a Supabase project
+2. Open SQL Editor
+3. Run `supabase/schema.sql`
+4. Enable Email auth
+5. Copy your project URL and anon key into `.env`
 
-## 3. Database tables
+## Cloudflare Pages
 
-This starter uses:
-- `mocs`
-- `moc_parts`
+- Build command: `npm run build`
+- Output directory: `dist`
 
-The schema also enables Row Level Security so each signed-in user only sees their own data.
+Environment variables:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
-## 4. Auth
+## Current status
 
-This starter uses password auth with email + password.
-You can switch to magic links later if you prefer.
+Included:
+- Auth
+- Dashboard
+- Manual MOC creation
+- Manual part editing
+- Rebrickable CSV import preview
 
-## 5. Deploy to Cloudflare Pages
-
-### Option A: Git-based deploy
-- push this project to GitHub
-- create a Cloudflare Pages project
-- connect the repo
-- build command: `npm run build`
-- build output directory: `dist`
-- set environment variables:
-  - `VITE_SUPABASE_URL`
-  - `VITE_SUPABASE_ANON_KEY`
-
-### Option B: direct upload
-```bash
-npm run build
-```
-Then upload the `dist` folder to Cloudflare Pages.
-
-## 6. What is included
-
-- Dashboard of MOCs
-- Create MOC form
-- Per-MOC parts page
-- Add / edit / delete parts
-- Ordered / arrived / completed tracking
-- Buy list grouped by part + color
-
-## 7. What is not included yet
-
-- CSV importer from Rebrickable
-- Image fallback search logic
-- Manual image overrides
-- Advanced grouped buy-list actions
-- Multi-user collaboration
-
-## 8. Recommended next step
-
-After you confirm this starter works with Supabase auth and DB:
-- add the CSV importer
-- add grouped buy-list export
-- add image fallback logic back in
+Next:
+- Grouped buy list
+- Image fallback logic
+- Per-MOC arrival tracking inside grouped buy list
