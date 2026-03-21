@@ -38,10 +38,14 @@ function parseCSV(text) {
   const rows = []; let row = []; let field = ""; let inQuotes = false;
   for (let i = 0; i < text.length; i++) {
     const char = text[i], next = text[i + 1];
-    if (char === '"') { if (inQuotes && next === '"') { field += '"'; i++; } else inQuotes = !inQuotes; }
-    else if (char === "," && !inQuotes) { row.push(field); field = ""; }
-    else if ((char === "\n" || char === "\r") && !inQuotes) { if (char === "\r" && next === "\n") i++; row.push(field); if (row.some(c => c !== "")) rows.push(row); row = []; field = ""; }
-    else field += char;
+    if (char === '"') {
+      if (inQuotes && next === '"') { field += '"'; i++; } else inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      row.push(field); field = "";
+    } else if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") i++;
+      row.push(field); if (row.some(c => c !== "")) rows.push(row); row = []; field = "";
+    } else field += char;
   }
   if (field.length > 0 || row.length > 0) { row.push(field); if (row.some(c => c !== "")) rows.push(row); }
   return rows;
@@ -108,7 +112,9 @@ function AuthScreen({ onAuthed }) {
   </div></div>;
 }
 
-function ModalShell({ children }) { return <div className="modal-backdrop"><div className="modal">{children}</div></div>; }
+function ModalShell({ children, wide=false }) {
+  return <div className="modal-backdrop"><div className={`modal ${wide ? "wide-modal" : ""}`}>{children}</div></div>;
+}
 
 function ImportPreviewModal({ preview, onCancel, onConfirm, busy }) {
   const [name, setName] = useState(preview?.mocName || ""), [url, setUrl] = useState("");
@@ -175,6 +181,43 @@ function OrderEditorModal({ order, busy, onSave, onCancel, onDelete }) {
   </ModalShell>;
 }
 
+function OrderDetailsModal({ order, lines, onClose, onOpenMoc, onRemoveLine, onPatchArrived }) {
+  if (!order) return null;
+  return <ModalShell wide={true}>
+    <div className="row-between">
+      <div>
+        <h3>{order.name}</h3>
+        <div className="muted">{order.vendor || "No vendor"} • {order.status}</div>
+        <div className="muted">{order.order_date || "No date"}{order.tracking_number ? ` • ${order.tracking_number}` : ""}</div>
+        <div className="muted">{order.notes || "No notes"}</div>
+      </div>
+      <button className="btn" onClick={onClose}>Close</button>
+    </div>
+    <div className="section-block">
+      <h3>Assigned lines</h3>
+      {!lines.length ? <div className="muted">No lines assigned to this order.</div> : (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>MOC</th><th>Part</th><th>Color</th><th>Qty</th><th>Arrived</th><th></th></tr></thead>
+            <tbody>
+              {lines.map((line) => (
+                <tr key={line.partId}>
+                  <td><button className="link-button" onClick={() => onOpenMoc(line.mocId)}>{line.mocName}</button></td>
+                  <td>{line.partNumber}</td>
+                  <td>{line.color}</td>
+                  <td>{line.missing}</td>
+                  <td><input type="checkbox" checked={line.arrived} onChange={(e) => onPatchArrived(line.partId, e.target.checked)} /></td>
+                  <td><button className="btn small danger" onClick={() => onRemoveLine(order.id, line.partId)}>Remove from order</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  </ModalShell>;
+}
+
 function PartTable({ parts, onEdit, onDelete, onPatch }) {
   if (!parts.length) return <div className="muted">No parts here.</div>;
   return <div className="table-wrap"><table><thead><tr><th>Image</th><th>Part</th><th>Color</th><th>Need</th><th>Have</th><th>Missing</th><th>Ordered</th><th>Arrived</th><th>Completed</th><th></th></tr></thead><tbody>
@@ -211,6 +254,7 @@ function groupBuyRows(allParts, orderedState, mocFilterId, ordersByPartId) {
     if (belongsToFilteredMoc) row.matchesFilter = true;
     row.lines.push({
       partId: part.id, mocId: part.mocs?.id || "", mocName: part.mocs?.name || "MOC", mocUrl: part.mocs?.url || "",
+      partNumber: part.part_number, color: part.color,
       missing, ordered: !!part.ordered, arrived: !!part.arrived, belongsToFilteredMoc,
       orderName: ordersByPartId[part.id]?.name || "", orderId: ordersByPartId[part.id]?.id || ""
     });
@@ -220,8 +264,17 @@ function groupBuyRows(allParts, orderedState, mocFilterId, ordersByPartId) {
   return rows;
 }
 
-function BuyListSection({ title, subtitle, rows, mode, mocFilterId, onPatch, onPatchMany, onOpenMoc }) {
+function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, selectedIds, selectedOrderId, onToggleSelected, onSelectRow, onAssignSelectedToOrder, onRemoveSelectedFromOrder, onQuickAssignLine, onPatch, onPatchMany, onOpenMoc }) {
   return <div className="panel"><h2>{title}</h2><p className="subtitle">{subtitle}</p>
+    {mode === "ordered" ? <div className="bulk-bar">
+      <div className="muted">{selectedIds.length} selected</div>
+      <select value={selectedOrderId} onChange={(e) => onAssignSelectedToOrder("set_order_picker", e.target.value)}>
+        <option value="">Choose order for selected</option>
+        {orders.map((order) => <option key={order.id} value={order.id}>{order.name}</option>)}
+      </select>
+      <button className="btn" onClick={() => onAssignSelectedToOrder("assign_selected", selectedOrderId)} disabled={!selectedIds.length || !selectedOrderId}>Add selected to order</button>
+      <button className="btn" onClick={onRemoveSelectedFromOrder} disabled={!selectedIds.length}>Remove selected from order</button>
+    </div> : null}
     {!rows.length ? <div className="muted">Nothing here right now.</div> : <div className="table-wrap"><table><thead><tr><th>Part</th><th>Color</th><th>Total qty</th><th>Arrived qty</th><th>Pending qty</th><th>MOC lines</th></tr></thead><tbody>
       {rows.map((row)=>{ const allIds = row.lines.map((line)=>line.partId); return <tr key={`${mode}-${row.partNumber}-${row.color}`}>
         <td><div className="part-number-cell">{row.partNumber}</div><div className="group-actions">
@@ -229,6 +282,8 @@ function BuyListSection({ title, subtitle, rows, mode, mocFilterId, onPatch, onP
             <button className="btn small" onClick={()=>onPatchMany(allIds, { ordered:true, arrived:false })}>Order all</button>
             <button className="btn small" onClick={()=>onPatchMany(allIds, { ordered:false, arrived:false })}>Clear all</button>
           </> : <>
+            <button className="btn small" onClick={() => onSelectRow(allIds, true)}>Select all</button>
+            <button className="btn small" onClick={() => onSelectRow(allIds, false)}>Clear select</button>
             <button className="btn small" onClick={()=>onPatchMany(allIds, { arrived:true })}>Mark all arrived</button>
             <button className="btn small" onClick={()=>onPatchMany(allIds, { ordered:false, arrived:false })}>Back all to To Order</button>
           </>}
@@ -238,11 +293,21 @@ function BuyListSection({ title, subtitle, rows, mode, mocFilterId, onPatch, onP
           {row.lines.map((line)=> <div key={line.partId} className={`buy-line ${line.belongsToFilteredMoc ? "buy-line-focus" : ""}`}>
             <div className="buy-line-checkbox">
               {mode === "to_order" ? <input type="checkbox" checked={line.ordered} onChange={(e)=>onPatch(line.partId, { ordered:e.target.checked, arrived:false })} /> :
-              <div className="buy-line-actions"><input type="checkbox" checked={line.arrived} onChange={(e)=>onPatch(line.partId, { arrived:e.target.checked })} /><button className="btn small" onClick={()=>onPatch(line.partId, { ordered:false, arrived:false })}>Back to To Order</button></div>}
+              <div className="buy-line-actions">
+                <input type="checkbox" checked={selectedIds.includes(line.partId)} onChange={(e)=>onToggleSelected(line.partId, e.target.checked)} />
+                <input type="checkbox" checked={line.arrived} onChange={(e)=>onPatch(line.partId, { arrived:e.target.checked })} />
+                <button className="btn small" onClick={()=>onPatch(line.partId, { ordered:false, arrived:false })}>Back to To Order</button>
+              </div>}
             </div>
             <div className="buy-line-text">
               <div className="buy-line-title"><button className="link-button" onClick={()=>onOpenMoc(line.mocId)}>{line.mocName}</button><span> — Qty {line.missing}</span>{line.mocUrl ? <> — <a href={line.mocUrl} target="_blank" rel="noreferrer">URL</a></> : null}</div>
               <div className="muted">{mode === "to_order" ? (line.ordered ? "Marked as ordered" : "Still to order") : (line.arrived ? "Arrived" : "Pending arrival")}{mocFilterId && !line.belongsToFilteredMoc ? " • also needed by another MOC" : ""}{line.orderName ? ` • ${line.orderName}` : ""}</div>
+              {mode === "ordered" ? <div className="inline-order-assign">
+                <select value={line.orderId || ""} onChange={(e) => onQuickAssignLine(line.partId, line.orderId, e.target.value)}>
+                  <option value="">No order</option>
+                  {orders.map((order) => <option key={order.id} value={order.id}>{order.name}</option>)}
+                </select>
+              </div> : null}
             </div>
           </div>)}
         </td>
@@ -251,37 +316,35 @@ function BuyListSection({ title, subtitle, rows, mode, mocFilterId, onPatch, onP
   </div>;
 }
 
-function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onAssignOrder, onRemoveFromOrder }) {
+function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDetails }) {
   return <div className="panel">
     <div className="row-between"><h2>Orders</h2><button className="btn primary" onClick={() => onOpenOrderEditor({ status:"draft" })}>Create order</button></div>
-    <p className="subtitle">Create real orders and assign specific ordered MOC lines into them.</p>
-    {!orders.length ? <div className="muted">No orders yet.</div> : <div className="orders-grid">{orders.map((order) => <div key={order.id} className="order-card">
-      <div className="row-between"><div><div className="order-title">{order.name}</div><div className="muted">{order.vendor || "No vendor"} • {order.status}</div></div><button className="btn small" onClick={() => onOpenOrderEditor(order)}>Edit</button></div>
-      <div className="muted order-meta">{order.order_date || "No date"}{order.tracking_number ? ` • ${order.tracking_number}` : ""}</div>
-      <div className="muted order-meta">{order.notes || "No notes"}</div>
-      <div className="order-count">{order.order_items?.length || 0} lines assigned</div>
-    </div>)}</div>}
-    {orders.length ? <div className="section-block"><h3>Assign ordered lines to orders</h3>
-      {!groupedBuyRows.length ? <div className="muted">No ordered lines to assign.</div> : groupedBuyRows.map((row) => <div key={`${row.partNumber}-${row.color}`} className="assign-group">
-        <div className="assign-header"><strong>{row.partNumber}</strong> • {row.color}</div>
-        {row.lines.map((line) => <div key={line.partId} className="assign-line">
-          <div><strong>{line.mocName}</strong> — Qty {line.missing}<div className="muted">{line.orderName ? `Assigned to ${line.orderName}` : "Not assigned to an order"}</div></div>
-          <div className="assign-actions"><select value={line.orderId || ""} onChange={(e) => {
-            const next = e.target.value;
-            if (!next) onRemoveFromOrder(line.orderId, line.partId);
-            else onAssignOrder(next, line.orderId, line.partId);
-          }}>
-            <option value="">No order</option>
-            {orders.map((order) => <option key={order.id} value={order.id}>{order.name}</option>)}
-          </select></div>
-        </div>)}
-      </div>)}
-    </div> : null}
+    <p className="subtitle">Orders page is summary-focused. Open an order to inspect its assigned lines.</p>
+    {!orders.length ? <div className="muted">No orders yet.</div> : <div className="orders-grid">{orders.map((order) => {
+      const lineCount = order.order_items?.length || 0;
+      return <div key={order.id} className="order-card">
+        <div className="row-between">
+          <div>
+            <div className="order-title">{order.name}</div>
+            <div className="muted">{order.vendor || "No vendor"} • {order.status}</div>
+          </div>
+          <button className="btn small" onClick={() => onOpenOrderEditor(order)}>Edit</button>
+        </div>
+        <div className="muted order-meta">{order.order_date || "No date"}{order.tracking_number ? ` • ${order.tracking_number}` : ""}</div>
+        <div className="muted order-meta">{order.notes || "No notes"}</div>
+        <div className="order-count">{lineCount} lines assigned</div>
+        <div className="toolbar"><button className="btn small" onClick={() => onOpenOrderDetails(order)}>View details</button></div>
+      </div>;
+    })}</div>}
+    <div className="section-block">
+      <h3>Unassigned ordered lines</h3>
+      {groupedBuyRows.length ? <div className="muted">Use the Buy List to bulk-assign or per-line assign ordered items to orders.</div> : <div className="muted">No ordered lines right now.</div>}
+    </div>
   </div>;
 }
 
 export default function App() {
-  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null);
+  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState("");
   const selectedMoc = useMemo(() => mocs.find((m) => m.id === selectedMocId) || null, [mocs, selectedMocId]);
   const ordersByPartId = useMemo(() => { const map = {}; for (const order of orders) for (const item of order.order_items || []) map[item.moc_part_id] = { id: order.id, name: order.name }; return map; }, [orders]);
 
@@ -294,6 +357,7 @@ export default function App() {
 
   useEffect(() => { if (session?.user) { refreshMocs(); refreshAllParts(); refreshOrders(); } }, [session?.user?.id]);
   useEffect(() => { if (selectedMocId) { setPartSearch(""); setColorFilter("All"); setSortField("part"); setSortDir("asc"); refreshParts(selectedMocId); } else setParts([]); }, [selectedMocId]);
+  useEffect(() => { if (!showBuyList) { setSelectedOrderedIds([]); setSelectedOrderId(""); } }, [showBuyList]);
 
   async function refreshMocs() {
     try { const data = await listMocs(); setMocs(data); if (!selectedMocId && data.length) setSelectedMocId(data[0].id); if (selectedMocId && !data.find((m)=>m.id===selectedMocId)) setSelectedMocId(data[0]?.id ?? null); }
@@ -324,13 +388,55 @@ export default function App() {
   async function handleDeleteMoc() { if (!selectedMoc || !window.confirm(`Delete "${selectedMoc.name}"?`)) return; try { setBusy(true); await deleteMoc(selectedMoc.id); await refreshMocs(); await refreshAllParts(); setParts([]); } catch (err) { setError(err.message || "Could not delete MOC."); } finally { setBusy(false); } }
   async function handleSaveMocMeta(e) { e.preventDefault(); const f=new FormData(e.currentTarget); try { setBusy(true); await updateMoc(selectedMoc.id,{ name:String(f.get("name")||""), url:String(f.get("url")||"") }); await refreshMocs(); await refreshAllParts(); setEditingMoc(false); } catch (err) { setError(err.message || "Could not update MOC."); } finally { setBusy(false); } }
   async function handleSaveOrder(payload) { if (!payload.name) { setError("Order name is required."); return; } try { setBusy(true); if (editingOrder?.id) await updateOrder(editingOrder.id, payload); else await createOrder({ ...payload, userId: session.user.id }); await refreshOrders(); setEditingOrder(null); } catch (err) { setError(err.message || "Could not save order."); } finally { setBusy(false); } }
-  async function handleDeleteOrder(id) { if (!window.confirm("Delete this order?")) return; try { setBusy(true); await deleteOrder(id); await refreshOrders(); setEditingOrder(null); } catch (err) { setError(err.message || "Could not delete order."); } finally { setBusy(false); } }
-  async function handleAssignOrder(newOrderId, oldOrderId, partId) { try { setBusy(true); if (oldOrderId && oldOrderId !== newOrderId) await removePartFromOrder(oldOrderId, partId); if (newOrderId) await addPartToOrder(newOrderId, partId); await refreshOrders(); } catch (err) { setError(err.message || "Could not assign order."); } finally { setBusy(false); } }
+  async function handleDeleteOrder(id) { if (!window.confirm("Delete this order?")) return; try { setBusy(true); await deleteOrder(id); await refreshOrders(); setEditingOrder(null); setViewingOrder(null); } catch (err) { setError(err.message || "Could not delete order."); } finally { setBusy(false); } }
+  async function handleAssignOrder(newOrderId, oldOrderId, partId) {
+    try {
+      setBusy(true);
+      if (oldOrderId && oldOrderId !== newOrderId) await removePartFromOrder(oldOrderId, partId);
+      if (newOrderId) await addPartToOrder(newOrderId, partId);
+      await refreshOrders();
+    } catch (err) { setError(err.message || "Could not assign order."); }
+    finally { setBusy(false); }
+  }
   async function handleRemoveFromOrder(orderId, partId) { if (!orderId) return; try { setBusy(true); await removePartFromOrder(orderId, partId); await refreshOrders(); } catch (err) { setError(err.message || "Could not remove from order."); } finally { setBusy(false); } }
   async function handleSavePart(payload) { if (!selectedMoc) return; if (!payload.partNumber || !payload.color || payload.requiredQty < 1) { setError("Part number, color, and required quantity are required."); return; } try { setBusy(true); if (editingPart?.id) await updatePart(editingPart.id, payload); else await createPart(selectedMoc.id, payload); await refreshParts(selectedMoc.id); await refreshAllParts(); setEditingPart(null); } catch (err) { setError(err.message || "Could not save part."); } finally { setBusy(false); } }
   async function handleDeletePart(id) { if (!window.confirm("Delete this part?")) return; try { setBusy(true); await deletePart(id); await refreshParts(selectedMoc.id); await refreshAllParts(); } catch (err) { setError(err.message || "Could not delete part."); } finally { setBusy(false); } }
   async function patchPart(id, patch) { try { setBusy(true); await updatePart(id, patch); if (selectedMocId) await refreshParts(selectedMocId); await refreshAllParts(); } catch (err) { setError(err.message || "Could not update part."); } finally { setBusy(false); } }
   async function patchMultipleParts(partIds, patch) { try { setBusy(true); for (const id of partIds) await updatePart(id, patch); if (selectedMocId) await refreshParts(selectedMocId); await refreshAllParts(); } catch (err) { setError(err.message || "Could not update parts."); } finally { setBusy(false); } }
+  async function assignSelectedToOrder(action, orderId) {
+    if (action === "set_order_picker") { setSelectedOrderId(orderId); return; }
+    if (!selectedOrderedIds.length || !orderId) return;
+    try {
+      setBusy(true);
+      for (const partId of selectedOrderedIds) {
+        const existing = ordersByPartId[partId]?.id || "";
+        if (existing && existing !== orderId) await removePartFromOrder(existing, partId);
+        await addPartToOrder(orderId, partId);
+      }
+      setSelectedOrderedIds([]);
+      await refreshOrders();
+    } catch (err) { setError(err.message || "Could not assign selected lines."); }
+    finally { setBusy(false); }
+  }
+  async function removeSelectedFromOrder() {
+    if (!selectedOrderedIds.length) return;
+    try {
+      setBusy(true);
+      for (const partId of selectedOrderedIds) {
+        const existing = ordersByPartId[partId]?.id || "";
+        if (existing) await removePartFromOrder(existing, partId);
+      }
+      setSelectedOrderedIds([]);
+      await refreshOrders();
+    } catch (err) { setError(err.message || "Could not remove selected lines from orders."); }
+    finally { setBusy(false); }
+  }
+  function toggleSelectedOrdered(partId, checked) {
+    setSelectedOrderedIds((prev) => checked ? [...new Set([...prev, partId])] : prev.filter((id) => id !== partId));
+  }
+  function selectOrderedRow(partIds, checked) {
+    setSelectedOrderedIds((prev) => checked ? [...new Set([...prev, ...partIds])] : prev.filter((id) => !partIds.includes(id)));
+  }
   function openMocFromBuyList(mocId) { setShowBuyList(false); setShowOrders(false); setSelectedMocId(mocId); }
 
   const filteredParts = useMemo(() => parts.filter((p) => {
@@ -358,13 +464,18 @@ export default function App() {
   const buyFilterValue = buyListMocFilter === "all" ? null : buyListMocFilter;
   const toOrderRows = useMemo(() => groupBuyRows(allParts, "to_order", buyFilterValue, ordersByPartId), [allParts, buyFilterValue, ordersByPartId]);
   const orderedRows = useMemo(() => groupBuyRows(allParts, "ordered", buyFilterValue, ordersByPartId), [allParts, buyFilterValue, ordersByPartId]);
+  const viewingOrderLines = useMemo(() => {
+    if (!viewingOrder) return [];
+    const allowed = new Set((viewingOrder.order_items || []).map((i) => i.moc_part_id));
+    return orderedRows.flatMap((row) => row.lines).filter((line) => allowed.has(line.partId));
+  }, [viewingOrder, orderedRows]);
 
   if (loadingSession) return <div className="page centered"><div className="panel">Loading…</div></div>;
   if (!session?.user) return <AuthScreen onAuthed={async ()=>setSession(await getSession())} />;
 
   return <div className="page">
     <header className="header">
-      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 1: real Orders, grouped buy list, and MOC management.</p></div>
+      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 1 polish: scalable order assignment workflow.</p></div>
       <div className="toolbar">
         <button className="btn" onClick={() => { setShowBuyList(false); setShowOrders(false); }}>Dashboard</button>
         <button className="btn" onClick={() => { setShowBuyList(true); setShowOrders(false); }}>Buy List</button>
@@ -403,12 +514,13 @@ export default function App() {
         </> : <div className="panel">Create or import a MOC to get started.</div>}
       </main>
     </div> : showBuyList ? <div className="content">
-      <div className="panel"><div className="row-between"><h2>Buy List</h2><div className="buy-filter"><label><span>Filter To Order by MOC</span></label><select value={buyListMocFilter} onChange={(e)=>setBuyListMocFilter(e.target.value)}><option value="all">All MOCs</option>{mocs.map((moc)=><option key={moc.id} value={moc.id}>{moc.name}</option>)}</select></div></div><p className="subtitle">To Order shows missing quantities not yet ordered. When filtered by one MOC, shared parts still show the extra quantity needed by other MOCs too.</p></div>
-      <BuyListSection title="To Order" subtitle="Any missing quantity automatically appears here until you mark it as ordered." rows={toOrderRows} mode="to_order" mocFilterId={buyFilterValue} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
-      <BuyListSection title="Ordered" subtitle="Once ordered, these lines move here. Arrival is tracked per MOC line, and you can move any line back to To Order." rows={orderedRows} mode="ordered" mocFilterId={buyFilterValue} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
-    </div> : <OrdersPanel orders={orders} groupedBuyRows={orderedRows} onOpenOrderEditor={setEditingOrder} onAssignOrder={handleAssignOrder} onRemoveFromOrder={handleRemoveFromOrder} />}
+      <div className="panel"><div className="row-between"><h2>Buy List</h2><div className="buy-filter"><label><span>Filter To Order by MOC</span></label><select value={buyListMocFilter} onChange={(e)=>setBuyListMocFilter(e.target.value)}><option value="all">All MOCs</option>{mocs.map((moc)=><option key={moc.id} value={moc.id}>{moc.name}</option>)}</select></div></div><p className="subtitle">Assign to orders directly here. Bulk-select ordered lines, add them to an order, or remove them from an order.</p></div>
+      <BuyListSection title="To Order" subtitle="Any missing quantity automatically appears here until you mark it as ordered." rows={toOrderRows} mode="to_order" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
+      <BuyListSection title="Ordered" subtitle="Assign to orders directly here, line by line or in bulk." rows={orderedRows} mode="ordered" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
+    </div> : <OrdersPanel orders={orders} groupedBuyRows={orderedRows} onOpenOrderEditor={setEditingOrder} onOpenOrderDetails={setViewingOrder} />}
     <PartEditorModal part={editingPart} busy={busy} onSave={handleSavePart} onCancel={() => setEditingPart(null)} />
     <OrderEditorModal order={editingOrder} busy={busy} onSave={handleSaveOrder} onCancel={() => setEditingOrder(null)} onDelete={handleDeleteOrder} />
+    <OrderDetailsModal order={viewingOrder} lines={viewingOrderLines} onClose={() => setViewingOrder(null)} onOpenMoc={openMocFromBuyList} onRemoveLine={handleRemoveFromOrder} onPatchArrived={(partId, arrived) => patchPart(partId, { arrived })} />
     <ImportPreviewModal preview={csvPreview} busy={busy} onCancel={() => setCsvPreview(null)} onConfirm={confirmImportCsv} />
   </div>;
 }

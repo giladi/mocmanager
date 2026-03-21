@@ -73,3 +73,10 @@ Next:
 - Vendor, date, tracking, notes, status
 - Assign ordered MOC lines into orders
 - Edit and delete orders
+
+
+## Sprint 1 polish
+
+- Assign to orders directly in Buy List
+- Multi-select ordered lines and bulk-add to order
+- Orders page changed from giant line dump to summary cards + order details modal

@@ -271,3 +271,18 @@ th { background: #fafafa; }
 }
 .assign-line:first-of-type { border-top: none; }
 .assign-actions select { min-width: 180px; }
+
+
+.bulk-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.inline-order-assign {
+  margin-top: 6px;
+}
+.inline-order-assign select {
+  min-width: 180px;
+}
