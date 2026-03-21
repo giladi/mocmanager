@@ -264,15 +264,17 @@ function groupBuyRows(allParts, orderedState, mocFilterId, ordersByPartId) {
   return rows;
 }
 
-function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, selectedIds, selectedOrderId, onToggleSelected, onSelectRow, onAssignSelectedToOrder, onRemoveSelectedFromOrder, onQuickAssignLine, onPatch, onPatchMany, onOpenMoc }) {
+function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, selectedIds, selectedOrderId, onToggleSelected, onSelectRow, onSelectAllVisible, onAssignSelectedToOrder, onRemoveSelectedFromOrder, onQuickAssignLine, onPatch, onPatchMany, onOpenMoc }) {
   return <div className="panel"><h2>{title}</h2><p className="subtitle">{subtitle}</p>
     {mode === "ordered" ? <div className="bulk-bar">
       <div className="muted">{selectedIds.length} selected</div>
+      <button className="btn" onClick={() => onSelectAllVisible(rows, true)}>Select all visible</button>
+      <button className="btn" onClick={() => onSelectAllVisible(rows, false)} disabled={!selectedIds.length}>Clear visible</button>
       <select value={selectedOrderId} onChange={(e) => onAssignSelectedToOrder("set_order_picker", e.target.value)}>
         <option value="">Choose order for selected</option>
         {orders.map((order) => <option key={order.id} value={order.id}>{order.name}</option>)}
       </select>
-      <button className="btn" onClick={() => onAssignSelectedToOrder("assign_selected", selectedOrderId)} disabled={!selectedIds.length || !selectedOrderId}>Add selected to order</button>
+      <button className="btn" onClick={() => onAssignSelectedToOrder("assign_selected", selectedOrderId)} disabled={!selectedIds.length || !selectedOrderId}>Assign selected to order</button>
       <button className="btn" onClick={onRemoveSelectedFromOrder} disabled={!selectedIds.length}>Remove selected from order</button>
     </div> : null}
     {!rows.length ? <div className="muted">Nothing here right now.</div> : <div className="table-wrap"><table><thead><tr><th>Part</th><th>Color</th><th>Total qty</th><th>Arrived qty</th><th>Pending qty</th><th>MOC lines</th></tr></thead><tbody>
@@ -437,6 +439,10 @@ export default function App() {
   function selectOrderedRow(partIds, checked) {
     setSelectedOrderedIds((prev) => checked ? [...new Set([...prev, ...partIds])] : prev.filter((id) => !partIds.includes(id)));
   }
+  function selectAllVisibleOrdered(rows, checked) {
+    const visibleIds = rows.flatMap((row) => row.lines.map((line) => line.partId));
+    setSelectedOrderedIds((prev) => checked ? [...new Set([...prev, ...visibleIds])] : prev.filter((id) => !visibleIds.includes(id)));
+  }
   function openMocFromBuyList(mocId) { setShowBuyList(false); setShowOrders(false); setSelectedMocId(mocId); }
 
   const filteredParts = useMemo(() => parts.filter((p) => {
@@ -514,9 +520,9 @@ export default function App() {
         </> : <div className="panel">Create or import a MOC to get started.</div>}
       </main>
     </div> : showBuyList ? <div className="content">
-      <div className="panel"><div className="row-between"><h2>Buy List</h2><div className="buy-filter"><label><span>Filter To Order by MOC</span></label><select value={buyListMocFilter} onChange={(e)=>setBuyListMocFilter(e.target.value)}><option value="all">All MOCs</option>{mocs.map((moc)=><option key={moc.id} value={moc.id}>{moc.name}</option>)}</select></div></div><p className="subtitle">Assign to orders directly here. Bulk-select ordered lines, add them to an order, or remove them from an order.</p></div>
-      <BuyListSection title="To Order" subtitle="Any missing quantity automatically appears here until you mark it as ordered." rows={toOrderRows} mode="to_order" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
-      <BuyListSection title="Ordered" subtitle="Assign to orders directly here, line by line or in bulk." rows={orderedRows} mode="ordered" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
+      <div className="panel"><div className="row-between"><h2>Buy List</h2><div className="buy-filter"><label><span>Filter To Order by MOC</span></label><select value={buyListMocFilter} onChange={(e)=>setBuyListMocFilter(e.target.value)}><option value="all">All MOCs</option>{mocs.map((moc)=><option key={moc.id} value={moc.id}>{moc.name}</option>)}</select></div></div><p className="subtitle">Assign to orders directly here. In Ordered, you can select multiple lines, select all visible, and assign them to an order in one action.</p></div>
+      <BuyListSection title="To Order" subtitle="Any missing quantity automatically appears here until you mark it as ordered." rows={toOrderRows} mode="to_order" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onSelectAllVisible={selectAllVisibleOrdered} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
+      <BuyListSection title="Ordered" subtitle="Assign to orders directly here, line by line or in bulk." rows={orderedRows} mode="ordered" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onSelectAllVisible={selectAllVisibleOrdered} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
     </div> : <OrdersPanel orders={orders} groupedBuyRows={orderedRows} onOpenOrderEditor={setEditingOrder} onOpenOrderDetails={setViewingOrder} />}
     <PartEditorModal part={editingPart} busy={busy} onSave={handleSavePart} onCancel={() => setEditingPart(null)} />
     <OrderEditorModal order={editingOrder} busy={busy} onSave={handleSaveOrder} onCancel={() => setEditingOrder(null)} onDelete={handleDeleteOrder} />

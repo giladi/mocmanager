@@ -80,3 +80,10 @@ Next:
 - Assign to orders directly in Buy List
 - Multi-select ordered lines and bulk-add to order
 - Orders page changed from giant line dump to summary cards + order details modal
+
+
+## v9 refinement
+
+- Ordered now supports Select all visible
+- Bulk assign selected ordered lines to an order
+- Clear visible selection
