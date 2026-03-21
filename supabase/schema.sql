@@ -52,3 +52,52 @@ drop policy if exists parts_delete_own on public.moc_parts;
 create policy parts_delete_own on public.moc_parts for delete to authenticated using (
   exists (select 1 from public.mocs where public.mocs.id = public.moc_parts.moc_id and public.mocs.user_id = auth.uid())
 );
+
+
+create table if not exists public.orders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  vendor text,
+  order_date date,
+  tracking_number text,
+  notes text,
+  status text not null default 'draft',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.order_items (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  moc_part_id uuid not null references public.moc_parts(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique(order_id, moc_part_id)
+);
+
+alter table public.orders enable row level security;
+alter table public.order_items enable row level security;
+
+drop policy if exists orders_select_own on public.orders;
+create policy orders_select_own on public.orders for select to authenticated using (auth.uid() = user_id);
+drop policy if exists orders_insert_own on public.orders;
+create policy orders_insert_own on public.orders for insert to authenticated with check (auth.uid() = user_id);
+drop policy if exists orders_update_own on public.orders;
+create policy orders_update_own on public.orders for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists orders_delete_own on public.orders;
+create policy orders_delete_own on public.orders for delete to authenticated using (auth.uid() = user_id);
+
+drop policy if exists order_items_select_own on public.order_items;
+create policy order_items_select_own on public.order_items
+for select to authenticated using (
+  exists (select 1 from public.orders where public.orders.id = public.order_items.order_id and public.orders.user_id = auth.uid())
+);
+drop policy if exists order_items_insert_own on public.order_items;
+create policy order_items_insert_own on public.order_items
+for insert to authenticated with check (
+  exists (select 1 from public.orders where public.orders.id = public.order_items.order_id and public.orders.user_id = auth.uid())
+);
+drop policy if exists order_items_delete_own on public.order_items;
+create policy order_items_delete_own on public.order_items
+for delete to authenticated using (
+  exists (select 1 from public.orders where public.orders.id = public.order_items.order_id and public.orders.user_id = auth.uid())
+);

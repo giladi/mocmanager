@@ -129,3 +129,70 @@ export async function deletePart(id) {
   const { error } = await supabase.from("moc_parts").delete().eq("id", id);
   if (error) throw error;
 }
+
+
+export async function listOrders() {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*, order_items(id, moc_part_id)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function createOrder({ name, vendor, orderDate, trackingNumber, notes, status, userId }) {
+  const { data, error } = await supabase
+    .from("orders")
+    .insert({
+      user_id: userId,
+      name,
+      vendor: vendor || null,
+      order_date: orderDate || null,
+      tracking_number: trackingNumber || null,
+      notes: notes || null,
+      status: status || "draft"
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateOrder(id, patch) {
+  const payload = {};
+  if ("name" in patch) payload.name = patch.name;
+  if ("vendor" in patch) payload.vendor = patch.vendor || null;
+  if ("orderDate" in patch) payload.order_date = patch.orderDate || null;
+  if ("trackingNumber" in patch) payload.tracking_number = patch.trackingNumber || null;
+  if ("notes" in patch) payload.notes = patch.notes || null;
+  if ("status" in patch) payload.status = patch.status || "draft";
+  const { data, error } = await supabase
+    .from("orders")
+    .update(payload)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteOrder(id) {
+  const { error } = await supabase.from("orders").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function addPartToOrder(orderId, mocPartId) {
+  const { error } = await supabase
+    .from("order_items")
+    .upsert({ order_id: orderId, moc_part_id: mocPartId }, { onConflict: "order_id,moc_part_id" });
+  if (error) throw error;
+}
+
+export async function removePartFromOrder(orderId, mocPartId) {
+  const { error } = await supabase
+    .from("order_items")
+    .delete()
+    .eq("order_id", orderId)
+    .eq("moc_part_id", mocPartId);
+  if (error) throw error;
+}

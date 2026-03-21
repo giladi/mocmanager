@@ -65,3 +65,11 @@ Next:
 - Browser tab favicon added
 
 - Bulk actions per grouped part in Buy List: Order all, Clear all, Mark all arrived, Back all to To Order
+
+
+## Sprint 1 - Orders
+
+- Real orders as objects
+- Vendor, date, tracking, notes, status
+- Assign ordered MOC lines into orders
+- Edit and delete orders
