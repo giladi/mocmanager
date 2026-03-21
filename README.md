@@ -115,3 +115,10 @@ Next:
 - Vendor SKU / reference per line
 - Substitution / cancellation notes per line
 - Order metrics now use order-line arrival quantities
+
+
+## v14 hotfix
+
+- Clears stale deleted order from bulk picker automatically
+- Prevents assigning to a deleted/nonexistent order
+- Shows a clear error message instead of failing silently

@@ -426,6 +426,13 @@ export default function App() {
   useEffect(() => { if (session?.user) { refreshMocs(); refreshAllParts(); refreshOrders(); } }, [session?.user?.id]);
   useEffect(() => { if (selectedMocId) { setPartSearch(""); setColorFilter("All"); setSortField("part"); setSortDir("asc"); refreshParts(selectedMocId); } else setParts([]); }, [selectedMocId]);
   useEffect(() => { if (!showBuyList) { setSelectedOrderedIds([]); setSelectedOrderId(""); } }, [showBuyList]);
+  useEffect(() => {
+    if (!selectedOrderId) return;
+    const stillExists = orders.some((order) => order.id === selectedOrderId);
+    if (!stillExists) {
+      setSelectedOrderId("");
+    }
+  }, [orders, selectedOrderId]);
   useEffect(() => { if (!viewingOrder) setSelectedOrderDetailIds([]); }, [viewingOrder]);
 
   async function refreshMocs() {
@@ -465,6 +472,13 @@ export default function App() {
   async function handleSaveOrder(payload) { if (!payload.name) { setError("Order name is required."); return; } try { setBusy(true); if (editingOrder?.id) await updateOrder(editingOrder.id, payload); else await createOrder({ ...payload, userId: session.user.id }); await refreshOrders(); setEditingOrder(null); } catch (err) { setError(err.message || "Could not save order."); } finally { setBusy(false); } }
   async function handleDeleteOrder(id) { if (!window.confirm("Delete this order?")) return; try { setBusy(true); await deleteOrder(id); await refreshOrders(); setEditingOrder(null); setViewingOrder(null); } catch (err) { setError(err.message || "Could not delete order."); } finally { setBusy(false); } }
   async function handleAssignOrder(newOrderId, oldOrderId, partId) {
+    if (newOrderId) {
+      const validOrder = orders.find((order) => order.id === newOrderId);
+      if (!validOrder) {
+        setError("That order no longer exists. Please choose an existing order.");
+        return;
+      }
+    }
     try {
       setBusy(true);
       if (oldOrderId && oldOrderId !== newOrderId) await removePartFromOrder(oldOrderId, partId);
@@ -484,6 +498,12 @@ export default function App() {
   async function assignSelectedToOrder(action, orderId) {
     if (action === "set_order_picker") { setSelectedOrderId(orderId); return; }
     if (!selectedOrderedIds.length || !orderId) return;
+    const validOrder = orders.find((order) => order.id === orderId);
+    if (!validOrder) {
+      setSelectedOrderId("");
+      setError("The selected order no longer exists. Please choose an existing order again.");
+      return;
+    }
     try {
       setBusy(true);
       for (const partId of selectedOrderedIds) {
