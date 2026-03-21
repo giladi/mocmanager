@@ -385,25 +385,6 @@ export default function App() {
   const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]);
   const selectedMoc = useMemo(() => mocs.find((m) => m.id === selectedMocId) || null, [mocs, selectedMocId]);
 
-  const metricsByOrderId = useMemo(() => {
-    const metrics = {};
-    for (const order of orders) {
-      const assignedIds = new Set((order.order_items || []).map((i) => i.moc_part_id));
-      const lines = orderedRows.flatMap((row) => row.lines).filter((line) => assignedIds.has(line.partId));
-      const totalQty = lines.reduce((sum, line) => sum + line.missing, 0);
-      const arrivedQty = lines.filter((line) => line.arrived).reduce((sum, line) => sum + line.missing, 0);
-      const pendingQty = totalQty - arrivedQty;
-      metrics[order.id] = {
-        lines: lines.length,
-        totalQty,
-        arrivedQty,
-        pendingQty,
-        allArrived: lines.length > 0 && pendingQty === 0
-      };
-    }
-    return metrics;
-  }, [orders, orderedRows]);
-
   const ordersByPartId = useMemo(() => { const map = {}; for (const order of orders) for (const item of order.order_items || []) map[item.moc_part_id] = { id: order.id, name: order.name }; return map; }, [orders]);
 
   useEffect(() => {
@@ -568,6 +549,25 @@ export default function App() {
   const buyFilterValue = buyListMocFilter === "all" ? null : buyListMocFilter;
   const toOrderRows = useMemo(() => groupBuyRows(allParts, "to_order", buyFilterValue, ordersByPartId), [allParts, buyFilterValue, ordersByPartId]);
   const orderedRows = useMemo(() => groupBuyRows(allParts, "ordered", buyFilterValue, ordersByPartId), [allParts, buyFilterValue, ordersByPartId]);
+  const metricsByOrderId = useMemo(() => {
+    const metrics = {};
+    for (const order of orders) {
+      const assignedIds = new Set((order.order_items || []).map((i) => i.moc_part_id));
+      const lines = orderedRows.flatMap((row) => row.lines).filter((line) => assignedIds.has(line.partId));
+      const totalQty = lines.reduce((sum, line) => sum + line.missing, 0);
+      const arrivedQty = lines.filter((line) => line.arrived).reduce((sum, line) => sum + line.missing, 0);
+      const pendingQty = totalQty - arrivedQty;
+      metrics[order.id] = {
+        lines: lines.length,
+        totalQty,
+        arrivedQty,
+        pendingQty,
+        allArrived: lines.length > 0 && pendingQty === 0
+      };
+    }
+    return metrics;
+  }, [orders, orderedRows]);
+
   const viewingOrderLines = useMemo(() => {
     if (!viewingOrder) return [];
     const allowed = new Set((viewingOrder.order_items || []).map((i) => i.moc_part_id));

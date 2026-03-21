@@ -101,3 +101,8 @@ Next:
 - Order details supports multi-select bulk actions
 - Arrived/pending management inside order details
 - Completion hint when all assigned lines arrived
+
+
+## v12 hotfix
+
+- Fix startup crash caused by metricsByOrderId referencing orderedRows before initialization
