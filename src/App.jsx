@@ -504,7 +504,8 @@ function groupBuyRows(allParts, orderedState, mocFilterId) {
 }
 
 
-function BuyListSection({ title, subtitle, rows, mode, mocFilterId, onPatch, onOpenMoc }) {
+
+function BuyListSection({ title, subtitle, rows, mode, mocFilterId, onPatch, onPatchMany, onOpenMoc }) {
   return (
     <div className="panel">
       <h2>{title}</h2>
@@ -526,64 +527,82 @@ function BuyListSection({ title, subtitle, rows, mode, mocFilterId, onPatch, onO
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={`${mode}-${row.partNumber}-${row.color}`}>
-                  <td>{row.partNumber}</td>
-                  <td>{row.color}</td>
-                  <td>{row.totalMissing}</td>
-                  <td>{row.arrivedQty}</td>
-                  <td>{row.pendingQty}</td>
-                  <td className="moc-lines-cell">
-                    {row.lines.map((line) => (
-                      <div key={line.partId} className={`buy-line ${line.belongsToFilteredMoc ? "buy-line-focus" : ""}`}>
-                        <div className="buy-line-checkbox">
-                          {mode === "to_order" ? (
-                            <input
-                              type="checkbox"
-                              checked={line.ordered}
-                              onChange={(e) => onPatch(line.partId, { ordered: e.target.checked, arrived: false })}
-                            />
-                          ) : (
-                            <div className="buy-line-actions">
+              {rows.map((row) => {
+                const allIds = row.lines.map((line) => line.partId);
+                return (
+                  <tr key={`${mode}-${row.partNumber}-${row.color}`}>
+                    <td>
+                      <div className="part-number-cell">{row.partNumber}</div>
+                      <div className="group-actions">
+                        {mode === "to_order" ? (
+                          <>
+                            <button className="btn small" onClick={() => onPatchMany(allIds, { ordered: true, arrived: false })}>Order all</button>
+                            <button className="btn small" onClick={() => onPatchMany(allIds, { ordered: false, arrived: false })}>Clear all</button>
+                          </>
+                        ) : (
+                          <>
+                            <button className="btn small" onClick={() => onPatchMany(allIds, { arrived: true })}>Mark all arrived</button>
+                            <button className="btn small" onClick={() => onPatchMany(allIds, { ordered: false, arrived: false })}>Back all to To Order</button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td>{row.color}</td>
+                    <td>{row.totalMissing}</td>
+                    <td>{row.arrivedQty}</td>
+                    <td>{row.pendingQty}</td>
+                    <td className="moc-lines-cell">
+                      {row.lines.map((line) => (
+                        <div key={line.partId} className={`buy-line ${line.belongsToFilteredMoc ? "buy-line-focus" : ""}`}>
+                          <div className="buy-line-checkbox">
+                            {mode === "to_order" ? (
                               <input
                                 type="checkbox"
-                                checked={line.arrived}
-                                onChange={(e) => onPatch(line.partId, { arrived: e.target.checked })}
+                                checked={line.ordered}
+                                onChange={(e) => onPatch(line.partId, { ordered: e.target.checked, arrived: false })}
                               />
-                              <button
-                                className="btn small"
-                                onClick={() => onPatch(line.partId, { ordered: false, arrived: false })}
-                              >
-                                Back to To Order
+                            ) : (
+                              <div className="buy-line-actions">
+                                <input
+                                  type="checkbox"
+                                  checked={line.arrived}
+                                  onChange={(e) => onPatch(line.partId, { arrived: e.target.checked })}
+                                />
+                                <button
+                                  className="btn small"
+                                  onClick={() => onPatch(line.partId, { ordered: false, arrived: false })}
+                                >
+                                  Back to To Order
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="buy-line-text">
+                            <div className="buy-line-title">
+                              <button className="link-button" onClick={() => onOpenMoc(line.mocId)}>
+                                {line.mocName}
                               </button>
+                              <span> — Qty {line.missing}</span>
+                              {line.mocUrl ? <> — <a href={line.mocUrl} target="_blank" rel="noreferrer">URL</a></> : null}
                             </div>
-                          )}
-                        </div>
-                        <div className="buy-line-text">
-                          <div className="buy-line-title">
-                            <button className="link-button" onClick={() => onOpenMoc(line.mocId)}>
-                              {line.mocName}
-                            </button>
-                            <span> — Qty {line.missing}</span>
-                            {line.mocUrl ? <> — <a href={line.mocUrl} target="_blank" rel="noreferrer">URL</a></> : null}
-                          </div>
-                          <div className="muted">
-                            {mode === "to_order"
-                              ? (line.ordered ? "Marked as ordered" : "Still to order")
-                              : (line.arrived ? "Arrived" : "Pending arrival")}
-                            {mocFilterId && !line.belongsToFilteredMoc ? " • also needed by another MOC" : ""}
+                            <div className="muted">
+                              {mode === "to_order"
+                                ? (line.ordered ? "Marked as ordered" : "Still to order")
+                                : (line.arrived ? "Arrived" : "Pending arrival")}
+                              {mocFilterId && !line.belongsToFilteredMoc ? " • also needed by another MOC" : ""}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </td>
-                  <td className="link-cell">
-                    <a href={brickLinkSearchUrl(row.partNumber)} target="_blank" rel="noreferrer">BrickLink</a><br />
-                    <a href={brickOwlSearchUrl(row.partNumber, row.color)} target="_blank" rel="noreferrer">Brick Owl</a><br />
-                    <a href={rebrickableSearchUrl(row.partNumber)} target="_blank" rel="noreferrer">Rebrickable</a>
-                  </td>
-                </tr>
-              ))}
+                      ))}
+                    </td>
+                    <td className="link-cell">
+                      <a href={brickLinkSearchUrl(row.partNumber)} target="_blank" rel="noreferrer">BrickLink</a><br />
+                      <a href={brickOwlSearchUrl(row.partNumber, row.color)} target="_blank" rel="noreferrer">Brick Owl</a><br />
+                      <a href={rebrickableSearchUrl(row.partNumber)} target="_blank" rel="noreferrer">Rebrickable</a>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -807,6 +826,22 @@ export default function App() {
     }
   }
 
+
+async function patchMultipleParts(partIds, patch) {
+  try {
+    setBusy(true);
+    for (const id of partIds) {
+      await updatePart(id, patch);
+    }
+    if (selectedMocId) await refreshParts(selectedMocId);
+    await refreshAllParts();
+  } catch (err) {
+    setError(err.message || "Could not update parts.");
+  } finally {
+    setBusy(false);
+  }
+}
+
   function openMocFromBuyList(mocId) {
     setShowBuyList(false);
     setSelectedMocId(mocId);
@@ -996,6 +1031,7 @@ export default function App() {
             mode="to_order"
             mocFilterId={buyFilterValue}
             onPatch={patchPart}
+            onPatchMany={patchMultipleParts}
             onOpenMoc={openMocFromBuyList}
           />
           <BuyListSection
@@ -1005,6 +1041,7 @@ export default function App() {
             mode="ordered"
             mocFilterId={buyFilterValue}
             onPatch={patchPart}
+            onPatchMany={patchMultipleParts}
             onOpenMoc={openMocFromBuyList}
           />
         </div>

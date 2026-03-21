@@ -63,3 +63,5 @@ Next:
 - MOC line names in Buy List link back into the MOC page
 - To Order can be filtered by MOC while still showing extra shared quantity from other MOCs
 - Browser tab favicon added
+
+- Bulk actions per grouped part in Buy List: Order all, Clear all, Mark all arrived, Back all to To Order
