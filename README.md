@@ -93,3 +93,11 @@ Next:
 
 - Order details modal now scrolls internally
 - Header and Close button stay visible
+
+
+## Sprint 1.2 polish
+
+- Order cards now show summary metrics
+- Order details supports multi-select bulk actions
+- Arrived/pending management inside order details
+- Completion hint when all assigned lines arrived

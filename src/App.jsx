@@ -181,8 +181,13 @@ function OrderEditorModal({ order, busy, onSave, onCancel, onDelete }) {
   </ModalShell>;
 }
 
-function OrderDetailsModal({ order, lines, onClose, onOpenMoc, onRemoveLine, onPatchArrived }) {
+
+function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSelectAll, onClearSelection, onClose, onOpenMoc, onRemoveLine, onRemoveSelected, onPatchArrived, onPatchManyArrived }) {
   if (!order) return null;
+  const totalQty = lines.reduce((sum, line) => sum + line.missing, 0);
+  const arrivedQty = lines.filter((line) => line.arrived).reduce((sum, line) => sum + line.missing, 0);
+  const pendingQty = totalQty - arrivedQty;
+
   return (
     <div className="modal-backdrop">
       <div className="modal wide-modal modal-shell">
@@ -196,15 +201,35 @@ function OrderDetailsModal({ order, lines, onClose, onOpenMoc, onRemoveLine, onP
             </div>
             <button className="btn" onClick={onClose}>Close</button>
           </div>
+
+          <div className="order-summary-grid">
+            <div className="panel"><div className="stat-label">Lines</div><div className="stat-value small-stat">{lines.length}</div></div>
+            <div className="panel"><div className="stat-label">Total qty</div><div className="stat-value small-stat">{totalQty}</div></div>
+            <div className="panel"><div className="stat-label">Arrived qty</div><div className="stat-value small-stat">{arrivedQty}</div></div>
+            <div className="panel"><div className="stat-label">Pending qty</div><div className="stat-value small-stat">{pendingQty}</div></div>
+          </div>
+
           <div className="section-block">
-            <h3>Assigned lines</h3>
+            <div className="row-between">
+              <h3>Assigned lines</h3>
+              <div className="bulk-bar">
+                <div className="muted">{selectedIds.length} selected</div>
+                <button className="btn" onClick={onSelectAll}>Select all</button>
+                <button className="btn" onClick={onClearSelection} disabled={!selectedIds.length}>Clear</button>
+                <button className="btn" onClick={onPatchManyArrived(true)} disabled={!selectedIds.length}>Mark selected arrived</button>
+                <button className="btn" onClick={onPatchManyArrived(false)} disabled={!selectedIds.length}>Mark selected pending</button>
+                <button className="btn danger" onClick={onRemoveSelected} disabled={!selectedIds.length}>Remove selected</button>
+              </div>
+            </div>
+
             {!lines.length ? <div className="muted">No lines assigned to this order.</div> : (
               <div className="table-wrap order-lines-wrap">
                 <table>
-                  <thead><tr><th>MOC</th><th>Part</th><th>Color</th><th>Qty</th><th>Arrived</th><th></th></tr></thead>
+                  <thead><tr><th></th><th>MOC</th><th>Part</th><th>Color</th><th>Qty</th><th>Arrived</th><th></th></tr></thead>
                   <tbody>
                     {lines.map((line) => (
                       <tr key={line.partId}>
+                        <td><input type="checkbox" checked={selectedIds.includes(line.partId)} onChange={(e) => onToggleSelected(line.partId, e.target.checked)} /></td>
                         <td><button className="link-button" onClick={() => onOpenMoc(line.mocId)}>{line.mocName}</button></td>
                         <td>{line.partNumber}</td>
                         <td>{line.color}</td>
@@ -223,7 +248,6 @@ function OrderDetailsModal({ order, lines, onClose, onOpenMoc, onRemoveLine, onP
     </div>
   );
 }
-
 function PartTable({ parts, onEdit, onDelete, onPatch }) {
   if (!parts.length) return <div className="muted">No parts here.</div>;
   return <div className="table-wrap"><table><thead><tr><th>Image</th><th>Part</th><th>Color</th><th>Need</th><th>Have</th><th>Missing</th><th>Ordered</th><th>Arrived</th><th>Completed</th><th></th></tr></thead><tbody>
@@ -324,12 +348,13 @@ function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, sele
   </div>;
 }
 
-function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDetails }) {
+
+function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDetails, metricsByOrderId }) {
   return <div className="panel">
     <div className="row-between"><h2>Orders</h2><button className="btn primary" onClick={() => onOpenOrderEditor({ status:"draft" })}>Create order</button></div>
     <p className="subtitle">Orders page is summary-focused. Open an order to inspect its assigned lines.</p>
     {!orders.length ? <div className="muted">No orders yet.</div> : <div className="orders-grid">{orders.map((order) => {
-      const lineCount = order.order_items?.length || 0;
+      const metrics = metricsByOrderId[order.id] || { lines: 0, totalQty: 0, arrivedQty: 0, pendingQty: 0, allArrived: false };
       return <div key={order.id} className="order-card">
         <div className="row-between">
           <div>
@@ -340,7 +365,13 @@ function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDet
         </div>
         <div className="muted order-meta">{order.order_date || "No date"}{order.tracking_number ? ` • ${order.tracking_number}` : ""}</div>
         <div className="muted order-meta">{order.notes || "No notes"}</div>
-        <div className="order-count">{lineCount} lines assigned</div>
+        <div className="order-metrics">
+          <div><strong>{metrics.lines}</strong> lines</div>
+          <div><strong>{metrics.totalQty}</strong> total qty</div>
+          <div><strong>{metrics.arrivedQty}</strong> arrived</div>
+          <div><strong>{metrics.pendingQty}</strong> pending</div>
+        </div>
+        {metrics.allArrived && metrics.lines > 0 ? <div className="success-hint">All assigned lines arrived</div> : null}
         <div className="toolbar"><button className="btn small" onClick={() => onOpenOrderDetails(order)}>View details</button></div>
       </div>;
     })}</div>}
@@ -350,10 +381,29 @@ function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDet
     </div>
   </div>;
 }
-
 export default function App() {
-  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState("");
+  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]);
   const selectedMoc = useMemo(() => mocs.find((m) => m.id === selectedMocId) || null, [mocs, selectedMocId]);
+
+  const metricsByOrderId = useMemo(() => {
+    const metrics = {};
+    for (const order of orders) {
+      const assignedIds = new Set((order.order_items || []).map((i) => i.moc_part_id));
+      const lines = orderedRows.flatMap((row) => row.lines).filter((line) => assignedIds.has(line.partId));
+      const totalQty = lines.reduce((sum, line) => sum + line.missing, 0);
+      const arrivedQty = lines.filter((line) => line.arrived).reduce((sum, line) => sum + line.missing, 0);
+      const pendingQty = totalQty - arrivedQty;
+      metrics[order.id] = {
+        lines: lines.length,
+        totalQty,
+        arrivedQty,
+        pendingQty,
+        allArrived: lines.length > 0 && pendingQty === 0
+      };
+    }
+    return metrics;
+  }, [orders, orderedRows]);
+
   const ordersByPartId = useMemo(() => { const map = {}; for (const order of orders) for (const item of order.order_items || []) map[item.moc_part_id] = { id: order.id, name: order.name }; return map; }, [orders]);
 
   useEffect(() => {
@@ -366,6 +416,7 @@ export default function App() {
   useEffect(() => { if (session?.user) { refreshMocs(); refreshAllParts(); refreshOrders(); } }, [session?.user?.id]);
   useEffect(() => { if (selectedMocId) { setPartSearch(""); setColorFilter("All"); setSortField("part"); setSortDir("asc"); refreshParts(selectedMocId); } else setParts([]); }, [selectedMocId]);
   useEffect(() => { if (!showBuyList) { setSelectedOrderedIds([]); setSelectedOrderId(""); } }, [showBuyList]);
+  useEffect(() => { if (!viewingOrder) setSelectedOrderDetailIds([]); }, [viewingOrder]);
 
   async function refreshMocs() {
     try { const data = await listMocs(); setMocs(data); if (!selectedMocId && data.length) setSelectedMocId(data[0].id); if (selectedMocId && !data.find((m)=>m.id===selectedMocId)) setSelectedMocId(data[0]?.id ?? null); }
@@ -451,6 +502,47 @@ export default function App() {
   }
   function openMocFromBuyList(mocId) { setShowBuyList(false); setShowOrders(false); setSelectedMocId(mocId); }
 
+
+  function toggleSelectedOrderDetail(partId, checked) {
+    setSelectedOrderDetailIds((prev) => checked ? [...new Set([...prev, partId])] : prev.filter((id) => id !== partId));
+  }
+  function selectAllOrderDetails(lines, checked) {
+    const ids = lines.map((line) => line.partId);
+    setSelectedOrderDetailIds((prev) => checked ? [...new Set([...prev, ...ids])] : prev.filter((id) => !ids.includes(id)));
+  }
+  async function removeSelectedFromViewingOrder() {
+    if (!viewingOrder || !selectedOrderDetailIds.length) return;
+    try {
+      setBusy(true);
+      for (const partId of selectedOrderDetailIds) {
+        await removePartFromOrder(viewingOrder.id, partId);
+      }
+      setSelectedOrderDetailIds([]);
+      await refreshOrders();
+    } catch (err) {
+      setError(err.message || "Could not remove selected lines from order.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  function patchManyViewingOrderArrived(arrived) {
+    return async () => {
+      if (!selectedOrderDetailIds.length) return;
+      try {
+        setBusy(true);
+        for (const partId of selectedOrderDetailIds) {
+          await updatePart(partId, { arrived });
+        }
+        await refreshAllParts();
+        if (selectedMocId) await refreshParts(selectedMocId);
+      } catch (err) {
+        setError(err.message || "Could not update selected order lines.");
+      } finally {
+        setBusy(false);
+      }
+    };
+  }
+
   const filteredParts = useMemo(() => parts.filter((p) => {
     const matchesSearch = !partSearch || p.part_number.toLowerCase().includes(partSearch.toLowerCase()) || p.color.toLowerCase().includes(partSearch.toLowerCase());
     const matchesColor = colorFilter === "All" || p.color === colorFilter;
@@ -479,8 +571,19 @@ export default function App() {
   const viewingOrderLines = useMemo(() => {
     if (!viewingOrder) return [];
     const allowed = new Set((viewingOrder.order_items || []).map((i) => i.moc_part_id));
-    return orderedRows.flatMap((row) => row.lines).filter((line) => allowed.has(line.partId));
-  }, [viewingOrder, orderedRows]);
+    return allParts
+      .filter((part) => allowed.has(part.id))
+      .map((part) => ({
+        partId: part.id,
+        mocId: part.mocs?.id || "",
+        mocName: part.mocs?.name || "MOC",
+        partNumber: part.part_number,
+        color: part.color,
+        missing: Math.max(part.required_qty - part.have_qty, 0),
+        arrived: !!part.arrived
+      }))
+      .sort((a, b) => a.mocName.localeCompare(b.mocName) || a.partNumber.localeCompare(b.partNumber));
+  }, [viewingOrder, allParts]);
 
   if (loadingSession) return <div className="page centered"><div className="panel">Loading…</div></div>;
   if (!session?.user) return <AuthScreen onAuthed={async ()=>setSession(await getSession())} />;
@@ -529,10 +632,10 @@ export default function App() {
       <div className="panel"><div className="row-between"><h2>Buy List</h2><div className="buy-filter"><label><span>Filter To Order by MOC</span></label><select value={buyListMocFilter} onChange={(e)=>setBuyListMocFilter(e.target.value)}><option value="all">All MOCs</option>{mocs.map((moc)=><option key={moc.id} value={moc.id}>{moc.name}</option>)}</select></div></div><p className="subtitle">Assign to orders directly here. In Ordered, you can select multiple lines, select all visible, and assign them to an order in one action.</p></div>
       <BuyListSection title="To Order" subtitle="Any missing quantity automatically appears here until you mark it as ordered." rows={toOrderRows} mode="to_order" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onSelectAllVisible={selectAllVisibleOrdered} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
       <BuyListSection title="Ordered" subtitle="Assign to orders directly here, line by line or in bulk." rows={orderedRows} mode="ordered" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onSelectAllVisible={selectAllVisibleOrdered} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
-    </div> : <OrdersPanel orders={orders} groupedBuyRows={orderedRows} onOpenOrderEditor={setEditingOrder} onOpenOrderDetails={setViewingOrder} />}
+    </div> : <OrdersPanel orders={orders} groupedBuyRows={orderedRows} onOpenOrderEditor={setEditingOrder} onOpenOrderDetails={setViewingOrder} metricsByOrderId={metricsByOrderId} />}
     <PartEditorModal part={editingPart} busy={busy} onSave={handleSavePart} onCancel={() => setEditingPart(null)} />
     <OrderEditorModal order={editingOrder} busy={busy} onSave={handleSaveOrder} onCancel={() => setEditingOrder(null)} onDelete={handleDeleteOrder} />
-    <OrderDetailsModal order={viewingOrder} lines={viewingOrderLines} onClose={() => setViewingOrder(null)} onOpenMoc={openMocFromBuyList} onRemoveLine={handleRemoveFromOrder} onPatchArrived={(partId, arrived) => patchPart(partId, { arrived })} />
+    <OrderDetailsModal order={viewingOrder} lines={viewingOrderLines} selectedIds={selectedOrderDetailIds} onToggleSelected={toggleSelectedOrderDetail} onSelectAll={() => selectAllOrderDetails(viewingOrderLines, true)} onClearSelection={() => selectAllOrderDetails(viewingOrderLines, false)} onClose={() => setViewingOrder(null)} onOpenMoc={openMocFromBuyList} onRemoveLine={handleRemoveFromOrder} onRemoveSelected={removeSelectedFromViewingOrder} onPatchArrived={(partId, arrived) => patchPart(partId, { arrived })} onPatchManyArrived={patchManyViewingOrderArrived} />
     <ImportPreviewModal preview={csvPreview} busy={busy} onCancel={() => setCsvPreview(null)} onConfirm={confirmImportCsv} />
   </div>;
 }
