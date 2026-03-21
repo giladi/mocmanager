@@ -298,7 +298,7 @@ function groupBuyRows(allParts, orderedState, mocFilterId, ordersByPartId) {
       partId: part.id, mocId: part.mocs?.id || "", mocName: part.mocs?.name || "MOC", mocUrl: part.mocs?.url || "",
       partNumber: part.part_number, color: part.color,
       missing, ordered: !!part.ordered, arrived: !!part.arrived, belongsToFilteredMoc,
-      orderName: ordersByPartId[part.id]?.name || "", orderId: ordersByPartId[part.id]?.id || ""
+      orderName: ordersByPartId[part.id]?.orderName || "", orderId: ordersByPartId[part.id]?.orderId || ""
     });
   }
   const rows = [...grouped.values()].filter((row)=>!mocFilterId || row.matchesFilter).sort((a,b)=>a.partNumber.localeCompare(b.partNumber) || a.color.localeCompare(b.color));

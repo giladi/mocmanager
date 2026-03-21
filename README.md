@@ -122,3 +122,9 @@ Next:
 - Clears stale deleted order from bulk picker automatically
 - Prevents assigning to a deleted/nonexistent order
 - Shows a clear error message instead of failing silently
+
+
+## v15 display hotfix
+
+- Fix Buy List order assignment display after Sprint 2 data-model changes
+- UI now reads orderId/orderName correctly from ordersByPartId
