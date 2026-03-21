@@ -128,3 +128,11 @@ Next:
 
 - Fix Buy List order assignment display after Sprint 2 data-model changes
 - UI now reads orderId/orderName correctly from ordersByPartId
+
+
+## Sprint 2 wrap-up
+
+- Quantities now drive default arrival status
+- Cancelled/substituted count as resolved, not pending
+- Order summaries include resolved qty and all-resolved hint
+- Line editing better syncs status and quantities
