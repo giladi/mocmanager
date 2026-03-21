@@ -183,39 +183,45 @@ function OrderEditorModal({ order, busy, onSave, onCancel, onDelete }) {
 
 function OrderDetailsModal({ order, lines, onClose, onOpenMoc, onRemoveLine, onPatchArrived }) {
   if (!order) return null;
-  return <ModalShell wide={true}>
-    <div className="row-between">
-      <div>
-        <h3>{order.name}</h3>
-        <div className="muted">{order.vendor || "No vendor"} • {order.status}</div>
-        <div className="muted">{order.order_date || "No date"}{order.tracking_number ? ` • ${order.tracking_number}` : ""}</div>
-        <div className="muted">{order.notes || "No notes"}</div>
-      </div>
-      <button className="btn" onClick={onClose}>Close</button>
-    </div>
-    <div className="section-block">
-      <h3>Assigned lines</h3>
-      {!lines.length ? <div className="muted">No lines assigned to this order.</div> : (
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>MOC</th><th>Part</th><th>Color</th><th>Qty</th><th>Arrived</th><th></th></tr></thead>
-            <tbody>
-              {lines.map((line) => (
-                <tr key={line.partId}>
-                  <td><button className="link-button" onClick={() => onOpenMoc(line.mocId)}>{line.mocName}</button></td>
-                  <td>{line.partNumber}</td>
-                  <td>{line.color}</td>
-                  <td>{line.missing}</td>
-                  <td><input type="checkbox" checked={line.arrived} onChange={(e) => onPatchArrived(line.partId, e.target.checked)} /></td>
-                  <td><button className="btn small danger" onClick={() => onRemoveLine(order.id, line.partId)}>Remove from order</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+  return (
+    <div className="modal-backdrop">
+      <div className="modal wide-modal modal-shell">
+        <div className="modal-scroll">
+          <div className="row-between modal-sticky-header">
+            <div>
+              <h3>{order.name}</h3>
+              <div className="muted">{order.vendor || "No vendor"} • {order.status}</div>
+              <div className="muted">{order.order_date || "No date"}{order.tracking_number ? ` • ${order.tracking_number}` : ""}</div>
+              <div className="muted">{order.notes || "No notes"}</div>
+            </div>
+            <button className="btn" onClick={onClose}>Close</button>
+          </div>
+          <div className="section-block">
+            <h3>Assigned lines</h3>
+            {!lines.length ? <div className="muted">No lines assigned to this order.</div> : (
+              <div className="table-wrap order-lines-wrap">
+                <table>
+                  <thead><tr><th>MOC</th><th>Part</th><th>Color</th><th>Qty</th><th>Arrived</th><th></th></tr></thead>
+                  <tbody>
+                    {lines.map((line) => (
+                      <tr key={line.partId}>
+                        <td><button className="link-button" onClick={() => onOpenMoc(line.mocId)}>{line.mocName}</button></td>
+                        <td>{line.partNumber}</td>
+                        <td>{line.color}</td>
+                        <td>{line.missing}</td>
+                        <td><input type="checkbox" checked={line.arrived} onChange={(e) => onPatchArrived(line.partId, e.target.checked)} /></td>
+                        <td><button className="btn small danger" onClick={() => onRemoveLine(order.id, line.partId)}>Remove from order</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
-  </ModalShell>;
+  );
 }
 
 function PartTable({ parts, onEdit, onDelete, onPatch }) {

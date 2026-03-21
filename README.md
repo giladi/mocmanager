@@ -87,3 +87,9 @@ Next:
 - Ordered now supports Select all visible
 - Bulk assign selected ordered lines to an order
 - Clear visible selection
+
+
+## v10 modal polish
+
+- Order details modal now scrolls internally
+- Header and Close button stay visible
