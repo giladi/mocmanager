@@ -327,3 +327,31 @@ th { background: #fafafa; }
   margin-bottom: 10px;
   font-size: 14px;
 }
+
+
+.order-lines-wrap input,
+.order-lines-wrap select {
+  min-width: 110px;
+}
+
+.order-lines-wrap td {
+  vertical-align: middle;
+}
+
+.order-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(100px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.success-hint {
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}

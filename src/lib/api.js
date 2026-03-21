@@ -134,7 +134,7 @@ export async function deletePart(id) {
 export async function listOrders() {
   const { data, error } = await supabase
     .from("orders")
-    .select("*, order_items(id, moc_part_id)")
+    .select("*, order_items(id, moc_part_id, qty_ordered, qty_arrived, line_status, vendor_sku, substitution_note)")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data;
@@ -181,11 +181,37 @@ export async function deleteOrder(id) {
   if (error) throw error;
 }
 
-export async function addPartToOrder(orderId, mocPartId) {
+export async function addPartToOrder(orderId, mocPartId, defaults = {}) {
+  const payload = {
+    order_id: orderId,
+    moc_part_id: mocPartId,
+    qty_ordered: defaults.qtyOrdered ?? null,
+    qty_arrived: defaults.qtyArrived ?? 0,
+    line_status: defaults.lineStatus ?? "ordered",
+    vendor_sku: defaults.vendorSku ?? null,
+    substitution_note: defaults.substitutionNote ?? null,
+  };
   const { error } = await supabase
     .from("order_items")
-    .upsert({ order_id: orderId, moc_part_id: mocPartId }, { onConflict: "order_id,moc_part_id" });
+    .upsert(payload, { onConflict: "order_id,moc_part_id" });
   if (error) throw error;
+}
+
+export async function updateOrderItem(id, patch) {
+  const payload = {};
+  if ("qtyOrdered" in patch) payload.qty_ordered = patch.qtyOrdered;
+  if ("qtyArrived" in patch) payload.qty_arrived = patch.qtyArrived;
+  if ("lineStatus" in patch) payload.line_status = patch.lineStatus;
+  if ("vendorSku" in patch) payload.vendor_sku = patch.vendorSku || null;
+  if ("substitutionNote" in patch) payload.substitution_note = patch.substitutionNote || null;
+  const { data, error } = await supabase
+    .from("order_items")
+    .update(payload)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function removePartFromOrder(orderId, mocPartId) {

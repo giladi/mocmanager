@@ -106,3 +106,12 @@ Next:
 ## v12 hotfix
 
 - Fix startup crash caused by metricsByOrderId referencing orderedRows before initialization
+
+
+## Sprint 2 - Arrival & sourcing
+
+- Per-order-line ordered qty and arrived qty
+- Multi-stage sourcing status: ordered, in transit, partial arrived, arrived, cancelled, substituted
+- Vendor SKU / reference per line
+- Substitution / cancellation notes per line
+- Order metrics now use order-line arrival quantities

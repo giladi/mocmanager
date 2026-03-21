@@ -101,3 +101,27 @@ create policy order_items_delete_own on public.order_items
 for delete to authenticated using (
   exists (select 1 from public.orders where public.orders.id = public.order_items.order_id and public.orders.user_id = auth.uid())
 );
+
+
+alter table public.order_items
+  add column if not exists qty_ordered integer,
+  add column if not exists qty_arrived integer not null default 0,
+  add column if not exists line_status text not null default 'ordered',
+  add column if not exists vendor_sku text,
+  add column if not exists substitution_note text;
+
+drop policy if exists order_items_update_own on public.order_items;
+create policy order_items_update_own on public.order_items
+for update to authenticated using (
+  exists (
+    select 1 from public.orders
+    where public.orders.id = public.order_items.order_id
+      and public.orders.user_id = auth.uid()
+  )
+) with check (
+  exists (
+    select 1 from public.orders
+    where public.orders.id = public.order_items.order_id
+      and public.orders.user_id = auth.uid()
+  )
+);
