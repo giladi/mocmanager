@@ -157,3 +157,10 @@ Next:
 - Stronger status/priority visual badges
 - Quick status and priority editing from each MOC card
 - Better MOC card scanning and sorting behavior
+
+
+## Sprint 4.1
+
+- Per-part notes on MOC lines
+- Inline note editing in parts tables
+- Notes visible in Buy List and Order Details where relevant

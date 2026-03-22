@@ -447,3 +447,21 @@ th { background: #fafafa; }
   background: #6366f1;
   border-radius: 999px;
 }
+
+
+.note-cell {
+  min-width: 200px;
+}
+.note-input {
+  min-width: 180px;
+}
+.part-note-inline {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px 8px;
+  display: inline-block;
+}

@@ -156,6 +156,7 @@ function PartEditorModal({ part, busy, onSave, onCancel }) {
       <label className="checkbox"><input name="ordered" type="checkbox" defaultChecked={!!part.ordered} /><span>Ordered</span></label>
       <label className="checkbox"><input name="arrived" type="checkbox" defaultChecked={!!part.arrived} /><span>Arrived</span></label>
       <label className="checkbox"><input name="completed" type="checkbox" defaultChecked={!!part.completed} /><span>Completed</span></label>
+      <label><span>Note</span><input name="note" defaultValue={part.note || ""} placeholder="Optional note about collection, build, substitution, drawer, etc." /></label>
       <div className="toolbar"><button className="btn primary" disabled={busy}>Save</button><button type="button" className="btn" onClick={onCancel}>Cancel</button></div>
     </form>
   </ModalShell>;
@@ -234,7 +235,7 @@ function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSele
             {!lines.length ? <div className="muted">No lines assigned to this order.</div> : (
               <div className="table-wrap order-lines-wrap">
                 <table>
-                  <thead><tr><th></th><th>MOC</th><th>Part</th><th>Color</th><th>Ordered</th><th>Arrived</th><th>Status</th><th>Vendor SKU</th><th>Substitution / Note</th><th></th></tr></thead>
+                  <thead><tr><th></th><th>MOC</th><th>Part</th><th>Color</th><th>Part note</th><th>Ordered</th><th>Arrived</th><th>Status</th><th>Vendor SKU</th><th>Substitution / Note</th><th></th></tr></thead>
                   <tbody>
                     {lines.map((line) => {
                       const disableArrived = line.lineStatus === "cancelled";
@@ -244,6 +245,7 @@ function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSele
                           <td><button className="link-button" onClick={() => onOpenMoc(line.mocId)}>{line.mocName}</button></td>
                           <td>{line.partNumber}</td>
                           <td>{line.color}</td>
+                          <td>{line.note ? <span className="part-note-inline">📝 {line.note}</span> : <span className="muted">—</span>}</td>
                           <td><input className="inline-number" type="number" min="0" value={line.qtyOrdered} onChange={(e) => onUpdateOrderLine(line.partId, { qtyOrdered: Math.max(0, Number(e.target.value || 0)) })} /></td>
                           <td><input className="inline-number" type="number" min="0" max={line.qtyOrdered} disabled={disableArrived} value={line.qtyArrived} onChange={(e) => onUpdateOrderLine(line.partId, { qtyArrived: Math.max(0, Number(e.target.value || 0)) })} /></td>
                           <td>
@@ -276,7 +278,7 @@ function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSele
 
 function PartTable({ parts, onEdit, onDelete, onPatch }) {
   if (!parts.length) return <div className="muted">No parts here.</div>;
-  return <div className="table-wrap"><table><thead><tr><th>Image</th><th>Part</th><th>Color</th><th>Need</th><th>Have</th><th>Missing</th><th>Ordered</th><th>Arrived</th><th>Completed</th><th></th></tr></thead><tbody>
+  return <div className="table-wrap"><table><thead><tr><th>Image</th><th>Part</th><th>Color</th><th>Need</th><th>Have</th><th>Missing</th><th>Note</th><th>Ordered</th><th>Arrived</th><th>Completed</th><th></th></tr></thead><tbody>
     {parts.map((part) => {
       const missing = Math.max(part.required_qty - part.have_qty, 0);
       return <tr key={part.id}>
@@ -285,6 +287,9 @@ function PartTable({ parts, onEdit, onDelete, onPatch }) {
         <td>{part.color}</td><td>{part.required_qty}</td>
         <td><input className="inline-number" type="number" min="0" value={part.have_qty} onChange={(e)=>onPatch(part.id, { haveQty: Math.max(0, Number(e.target.value || 0)) })} /></td>
         <td>{missing}</td>
+        <td className="note-cell">
+          <input className="note-input" type="text" value={part.note || ""} placeholder="Add note" onChange={(e)=>onPatch(part.id, { note: e.target.value })} />
+        </td>
         <td><input type="checkbox" checked={part.ordered} onChange={(e)=>onPatch(part.id, { ordered:e.target.checked, arrived:e.target.checked ? part.arrived : false })} /></td>
         <td><input type="checkbox" checked={part.arrived} disabled={!part.ordered} onChange={(e)=>onPatch(part.id, { arrived:e.target.checked })} /></td>
         <td><input type="checkbox" checked={part.completed} onChange={(e)=>onPatch(part.id, { completed:e.target.checked })} /></td>
@@ -310,7 +315,7 @@ function groupBuyRows(allParts, orderedState, mocFilterId, ordersByPartId) {
     if (belongsToFilteredMoc) row.matchesFilter = true;
     row.lines.push({
       partId: part.id, mocId: part.mocs?.id || "", mocName: part.mocs?.name || "MOC", mocUrl: part.mocs?.url || "",
-      partNumber: part.part_number, color: part.color,
+      partNumber: part.part_number, color: part.color, note: part.note || "",
       missing, ordered: !!part.ordered, arrived: !!part.arrived, belongsToFilteredMoc,
       orderName: ordersByPartId[part.id]?.orderName || "", orderId: ordersByPartId[part.id]?.orderId || ""
     });
@@ -360,6 +365,7 @@ function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, sele
             <div className="buy-line-text">
               <div className="buy-line-title"><button className="link-button" onClick={()=>onOpenMoc(line.mocId)}>{line.mocName}</button><span> — Qty {line.missing}</span>{line.mocUrl ? <> — <a href={line.mocUrl} target="_blank" rel="noreferrer">URL</a></> : null}</div>
               <div className="muted">{mode === "to_order" ? (line.ordered ? "Marked as ordered" : "Still to order") : (line.arrived ? "Arrived" : "Pending arrival")}{mocFilterId && !line.belongsToFilteredMoc ? " • also needed by another MOC" : ""}{line.orderName ? ` • ${line.orderName}` : ""}</div>
+              {line.note ? <div className="part-note-inline">📝 {line.note}</div> : null}
               {mode === "ordered" ? <div className="inline-order-assign">
                 <select value={line.orderId || ""} onChange={(e) => onQuickAssignLine(line.partId, line.orderId, e.target.value)}>
                   <option value="">No order</option>
@@ -794,6 +800,7 @@ export default function App() {
           mocName: part.mocs?.name || "MOC",
           partNumber: part.part_number,
           color: part.color,
+          note: part.note || "",
           missing,
           qtyOrdered,
           qtyArrived,
@@ -811,7 +818,7 @@ export default function App() {
 
   return <div className="page">
     <header className="header">
-      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 3.2: dashboard polish, progress bars, and quick actions.</p></div>
+      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 4.1: per-part notes.</p></div>
       <div className="toolbar">
         <button className="btn" onClick={() => { setShowBuyList(false); setShowOrders(false); }}>Dashboard</button>
         <button className="btn" onClick={() => { setShowBuyList(true); setShowOrders(false); }}>Buy List</button>

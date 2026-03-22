@@ -130,3 +130,7 @@ for update to authenticated using (
 alter table public.mocs
   add column if not exists build_status text not null default 'planning',
   add column if not exists priority text not null default 'medium';
+
+
+alter table public.moc_parts
+  add column if not exists note text;

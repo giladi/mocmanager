@@ -101,7 +101,8 @@ export async function createPart(mocId, part) {
       have_qty: part.haveQty ?? 0,
       ordered: !!part.ordered,
       arrived: !!part.arrived,
-      completed: !!part.completed
+      completed: !!part.completed,
+      note: part.note || null
     })
     .select()
     .single();
@@ -118,6 +119,7 @@ export async function updatePart(id, patch) {
   if ("ordered" in patch) payload.ordered = patch.ordered;
   if ("arrived" in patch) payload.arrived = patch.arrived;
   if ("completed" in patch) payload.completed = patch.completed;
+  if ("note" in patch) payload.note = patch.note || null;
 
   const { data, error } = await supabase
     .from("moc_parts")
