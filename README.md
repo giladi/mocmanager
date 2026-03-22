@@ -136,3 +136,8 @@ Next:
 - Cancelled/substituted count as resolved, not pending
 - Order summaries include resolved qty and all-resolved hint
 - Line editing better syncs status and quantities
+
+
+## v17 scroll controls
+
+- Added floating Top and Bottom buttons for long pages like Buy List
