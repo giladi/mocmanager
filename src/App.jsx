@@ -441,6 +441,9 @@ export default function App() {
     list.sort((a, b) => {
       const ma = mocMetricsById[a.id] || {};
       const mb = mocMetricsById[b.id] || {};
+      const aCompleted = (a.build_status || "planning") === "completed";
+      const bCompleted = (b.build_status || "planning") === "completed";
+      if (mocSort !== "progress" && aCompleted !== bCompleted) return aCompleted ? 1 : -1;
       if (mocSort === "progress") return (mb.progressPct || 0) - (ma.progressPct || 0);
       if (mocSort === "priority") return (priorityRank[a.priority || "medium"] ?? 9) - (priorityRank[b.priority || "medium"] ?? 9);
       if (mocSort === "status") return (statusRank[a.build_status || "planning"] ?? 9) - (statusRank[b.build_status || "planning"] ?? 9);
@@ -522,6 +525,17 @@ export default function App() {
   }
   async function handleDeleteMoc() { if (!selectedMoc || !window.confirm(`Delete "${selectedMoc.name}"?`)) return; try { setBusy(true); await deleteMoc(selectedMoc.id); await refreshMocs(); await refreshAllParts(); setParts([]); } catch (err) { setError(err.message || "Could not delete MOC."); } finally { setBusy(false); } }
   async function handleSaveMocMeta(e) { e.preventDefault(); const f=new FormData(e.currentTarget); try { setBusy(true); await updateMoc(selectedMoc.id,{ name:String(f.get("name")||""), url:String(f.get("url")||""), buildStatus:String(f.get("buildStatus")||"planning"), priority:String(f.get("priority")||"medium") }); await refreshMocs(); await refreshAllParts(); setEditingMoc(false); } catch (err) { setError(err.message || "Could not update MOC."); } finally { setBusy(false); } }
+  async function quickUpdateMoc(id, patch) {
+    try {
+      setBusy(true);
+      await updateMoc(id, patch);
+      await refreshMocs();
+    } catch (err) {
+      setError(err.message || "Could not update MOC.");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function handleSaveOrder(payload) { if (!payload.name) { setError("Order name is required."); return; } try { setBusy(true); if (editingOrder?.id) await updateOrder(editingOrder.id, payload); else await createOrder({ ...payload, userId: session.user.id }); await refreshOrders(); setEditingOrder(null); } catch (err) { setError(err.message || "Could not save order."); } finally { setBusy(false); } }
   async function handleDeleteOrder(id) { if (!window.confirm("Delete this order?")) return; try { setBusy(true); await deleteOrder(id); await refreshOrders(); setEditingOrder(null); setViewingOrder(null); } catch (err) { setError(err.message || "Could not delete order."); } finally { setBusy(false); } }
   async function handleAssignOrder(newOrderId, oldOrderId, partId) {
@@ -797,7 +811,7 @@ export default function App() {
 
   return <div className="page">
     <header className="header">
-      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 3.1: MOC planning dashboard, status, priority, and progress.</p></div>
+      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 3.2: dashboard polish, progress bars, and quick actions.</p></div>
       <div className="toolbar">
         <button className="btn" onClick={() => { setShowBuyList(false); setShowOrders(false); }}>Dashboard</button>
         <button className="btn" onClick={() => { setShowBuyList(true); setShowOrders(false); }}>Buy List</button>
@@ -839,20 +853,45 @@ export default function App() {
           <div className="stack moc-dashboard-list">
             {visibleMocs.map((moc) => {
               const m = mocMetricsById[moc.id] || {};
+              const progress = m.progressPct || 0;
               return (
-                <button key={moc.id} className={`moc-item moc-card ${moc.id === selectedMocId ? "selected" : ""}`} onClick={() => setSelectedMocId(moc.id)}>
-                  <div className="row-between">
-                    <strong>{moc.name}</strong>
-                    <span className={`pill priority-${moc.priority || "medium"}`}>{(moc.priority || "medium").replace("_", " ")}</span>
+                <div key={moc.id} className={`moc-card-shell ${moc.id === selectedMocId ? "selected" : ""}`}>
+                  <button className={`moc-item moc-card ${moc.id === selectedMocId ? "selected" : ""}`} onClick={() => setSelectedMocId(moc.id)}>
+                    <div className="row-between">
+                      <strong>{moc.name}</strong>
+                      <span className={`pill priority-${moc.priority || "medium"}`}>{(moc.priority || "medium").replace("_", " ")}</span>
+                    </div>
+                    <div className="row-between">
+                      <span className={`status-badge status-${moc.build_status || "planning"}`}>{(moc.build_status || "planning").replaceAll("_", " ")}</span>
+                      <span className="muted">{progress}%</span>
+                    </div>
+                    <div className="progress-track">
+                      <div className="progress-fill" style={{ width: `${progress}%` }} />
+                    </div>
+                    <div className="moc-metrics">
+                      <div>{m.missingQty || 0} missing</div>
+                      <div>{m.orderedQty || 0} ordered</div>
+                      <div>{m.arrivedQty || 0} arrived</div>
+                      <div>{m.totalPieces || 0} pcs</div>
+                    </div>
+                  </button>
+                  <div className="moc-quick-actions">
+                    <select value={moc.build_status || "planning"} onChange={(e) => quickUpdateMoc(moc.id, { buildStatus: e.target.value })}>
+                      <option value="planning">Planning</option>
+                      <option value="collecting_parts">Collecting parts</option>
+                      <option value="ready_to_build">Ready to build</option>
+                      <option value="in_progress">In progress</option>
+                      <option value="paused">Paused</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                    <select value={moc.priority || "medium"} onChange={(e) => quickUpdateMoc(moc.id, { priority: e.target.value })}>
+                      <option value="blocker">Blocker</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
                   </div>
-                  <div className="muted">{(moc.build_status || "planning").replaceAll("_", " ")}</div>
-                  <div className="moc-metrics">
-                    <div>{m.progressPct || 0}% progress</div>
-                    <div>{m.missingQty || 0} missing</div>
-                    <div>{m.orderedQty || 0} ordered</div>
-                    <div>{m.arrivedQty || 0} arrived</div>
-                  </div>
-                </button>
+                </div>
               );
             })}
             {!visibleMocs.length ? <div className="muted">No MOCs match the filters.</div> : null}

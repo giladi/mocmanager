@@ -149,3 +149,11 @@ Next:
 - MOC priority
 - Dashboard filtering and sorting
 - Per-MOC planning metrics and progress
+
+
+## Sprint 3.2
+
+- Dashboard progress bars
+- Stronger status/priority visual badges
+- Quick status and priority editing from each MOC card
+- Better MOC card scanning and sorting behavior
