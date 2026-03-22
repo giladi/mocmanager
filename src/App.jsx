@@ -411,8 +411,44 @@ function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDet
 
 
 export default function App() {
-  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]);
+  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]), [mocStatusFilter, setMocStatusFilter] = useState("all"), [mocPriorityFilter, setMocPriorityFilter] = useState("all"), [mocSort, setMocSort] = useState("name");
   const selectedMoc = useMemo(() => mocs.find((m) => m.id === selectedMocId) || null, [mocs, selectedMocId]);
+  const mocMetricsById = useMemo(() => {
+    const map = {};
+    for (const moc of mocs) {
+      const mocParts = allParts.filter((p) => p.mocs?.id === moc.id);
+      const totalUniqueParts = mocParts.length;
+      const totalPieces = mocParts.reduce((sum, p) => sum + (p.required_qty || 0), 0);
+      const haveQty = mocParts.reduce((sum, p) => sum + Math.min(p.have_qty || 0, p.required_qty || 0), 0);
+      const missingQty = mocParts.reduce((sum, p) => sum + Math.max((p.required_qty || 0) - (p.have_qty || 0), 0), 0);
+      const orderedQty = mocParts.filter((p) => p.ordered).reduce((sum, p) => sum + Math.max((p.required_qty || 0) - (p.have_qty || 0), 0), 0);
+      const arrivedQty = mocParts.filter((p) => p.arrived).reduce((sum, p) => sum + Math.max((p.required_qty || 0) - (p.have_qty || 0), 0), 0);
+      const completedLines = mocParts.filter((p) => p.completed).length;
+      const progressPct = totalPieces > 0 ? Math.round((haveQty / totalPieces) * 100) : 0;
+      map[moc.id] = { totalUniqueParts, totalPieces, haveQty, missingQty, orderedQty, arrivedQty, completedLines, progressPct };
+    }
+    return map;
+  }, [mocs, allParts]);
+
+  const visibleMocs = useMemo(() => {
+    const list = mocs.filter((moc) => {
+      const statusOk = mocStatusFilter === "all" || (moc.build_status || "planning") === mocStatusFilter;
+      const priorityOk = mocPriorityFilter === "all" || (moc.priority || "medium") === mocPriorityFilter;
+      return statusOk && priorityOk;
+    });
+    const priorityRank = { blocker: 0, high: 1, medium: 2, low: 3 };
+    const statusRank = { planning: 0, collecting_parts: 1, ready_to_build: 2, in_progress: 3, paused: 4, completed: 5 };
+    list.sort((a, b) => {
+      const ma = mocMetricsById[a.id] || {};
+      const mb = mocMetricsById[b.id] || {};
+      if (mocSort === "progress") return (mb.progressPct || 0) - (ma.progressPct || 0);
+      if (mocSort === "priority") return (priorityRank[a.priority || "medium"] ?? 9) - (priorityRank[b.priority || "medium"] ?? 9);
+      if (mocSort === "status") return (statusRank[a.build_status || "planning"] ?? 9) - (statusRank[b.build_status || "planning"] ?? 9);
+      return (a.name || "").localeCompare(b.name || "");
+    });
+    return list;
+  }, [mocs, mocMetricsById, mocStatusFilter, mocPriorityFilter, mocSort]);
+
 
   const ordersByPartId = useMemo(() => {
   const map = {};
@@ -478,14 +514,14 @@ export default function App() {
     if (!csvPreview || !session?.user) return;
     try {
       setBusy(true);
-      const moc = await createMoc({ name:name.trim(), url:url.trim(), sourceFileName:csvPreview.sourceFileName, userId:session.user.id });
+      const moc = await createMoc({ name:name.trim(), url:url.trim(), sourceFileName:csvPreview.sourceFileName, userId:session.user.id, buildStatus:"planning", priority:"medium" });
       for (const part of csvPreview.parts) await createPart(moc.id, part);
       setCsvPreview(null); await refreshMocs(); await refreshAllParts(); setSelectedMocId(moc.id); setShowBuyList(false); setShowOrders(false);
     } catch (err) { setError(err.message || "Could not save imported MOC."); }
     finally { setBusy(false); }
   }
   async function handleDeleteMoc() { if (!selectedMoc || !window.confirm(`Delete "${selectedMoc.name}"?`)) return; try { setBusy(true); await deleteMoc(selectedMoc.id); await refreshMocs(); await refreshAllParts(); setParts([]); } catch (err) { setError(err.message || "Could not delete MOC."); } finally { setBusy(false); } }
-  async function handleSaveMocMeta(e) { e.preventDefault(); const f=new FormData(e.currentTarget); try { setBusy(true); await updateMoc(selectedMoc.id,{ name:String(f.get("name")||""), url:String(f.get("url")||"") }); await refreshMocs(); await refreshAllParts(); setEditingMoc(false); } catch (err) { setError(err.message || "Could not update MOC."); } finally { setBusy(false); } }
+  async function handleSaveMocMeta(e) { e.preventDefault(); const f=new FormData(e.currentTarget); try { setBusy(true); await updateMoc(selectedMoc.id,{ name:String(f.get("name")||""), url:String(f.get("url")||""), buildStatus:String(f.get("buildStatus")||"planning"), priority:String(f.get("priority")||"medium") }); await refreshMocs(); await refreshAllParts(); setEditingMoc(false); } catch (err) { setError(err.message || "Could not update MOC."); } finally { setBusy(false); } }
   async function handleSaveOrder(payload) { if (!payload.name) { setError("Order name is required."); return; } try { setBusy(true); if (editingOrder?.id) await updateOrder(editingOrder.id, payload); else await createOrder({ ...payload, userId: session.user.id }); await refreshOrders(); setEditingOrder(null); } catch (err) { setError(err.message || "Could not save order."); } finally { setBusy(false); } }
   async function handleDeleteOrder(id) { if (!window.confirm("Delete this order?")) return; try { setBusy(true); await deleteOrder(id); await refreshOrders(); setEditingOrder(null); setViewingOrder(null); } catch (err) { setError(err.message || "Could not delete order."); } finally { setBusy(false); } }
   async function handleAssignOrder(newOrderId, oldOrderId, partId) {
@@ -761,7 +797,7 @@ export default function App() {
 
   return <div className="page">
     <header className="header">
-      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 2 wrap-up: structured arrival & sourcing workflow.</p></div>
+      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 3.1: MOC planning dashboard, status, priority, and progress.</p></div>
       <div className="toolbar">
         <button className="btn" onClick={() => { setShowBuyList(false); setShowOrders(false); }}>Dashboard</button>
         <button className="btn" onClick={() => { setShowBuyList(true); setShowOrders(false); }}>Buy List</button>
@@ -774,15 +810,91 @@ export default function App() {
     {error ? <div className="error-banner">{error}</div> : null}
 
     {!showBuyList && !showOrders ? <div className="layout">
-      <aside className="sidebar panel"><div className="sidebar-header"><h2>MOCs</h2></div><div className="stack">
-        {mocs.map((moc) => <button key={moc.id} className={`moc-item ${moc.id===selectedMocId?"selected":""}`} onClick={() => setSelectedMocId(moc.id)}><strong>{moc.name}</strong><span>{moc.source_file_name || "Manual MOC"}</span></button>)}
-        {!mocs.length ? <div className="muted">No MOCs yet.</div> : null}
-      </div></aside>
+      <aside className="sidebar panel">
+          <div className="sidebar-header"><h2>MOCs</h2></div>
+          <div className="filters moc-dashboard-filters">
+            <select value={mocStatusFilter} onChange={(e) => setMocStatusFilter(e.target.value)}>
+              <option value="all">All statuses</option>
+              <option value="planning">Planning</option>
+              <option value="collecting_parts">Collecting parts</option>
+              <option value="ready_to_build">Ready to build</option>
+              <option value="in_progress">In progress</option>
+              <option value="paused">Paused</option>
+              <option value="completed">Completed</option>
+            </select>
+            <select value={mocPriorityFilter} onChange={(e) => setMocPriorityFilter(e.target.value)}>
+              <option value="all">All priorities</option>
+              <option value="blocker">Blocker</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <select value={mocSort} onChange={(e) => setMocSort(e.target.value)}>
+              <option value="name">Sort: Name</option>
+              <option value="priority">Sort: Priority</option>
+              <option value="status">Sort: Status</option>
+              <option value="progress">Sort: Progress</option>
+            </select>
+          </div>
+          <div className="stack moc-dashboard-list">
+            {visibleMocs.map((moc) => {
+              const m = mocMetricsById[moc.id] || {};
+              return (
+                <button key={moc.id} className={`moc-item moc-card ${moc.id === selectedMocId ? "selected" : ""}`} onClick={() => setSelectedMocId(moc.id)}>
+                  <div className="row-between">
+                    <strong>{moc.name}</strong>
+                    <span className={`pill priority-${moc.priority || "medium"}`}>{(moc.priority || "medium").replace("_", " ")}</span>
+                  </div>
+                  <div className="muted">{(moc.build_status || "planning").replaceAll("_", " ")}</div>
+                  <div className="moc-metrics">
+                    <div>{m.progressPct || 0}% progress</div>
+                    <div>{m.missingQty || 0} missing</div>
+                    <div>{m.orderedQty || 0} ordered</div>
+                    <div>{m.arrivedQty || 0} arrived</div>
+                  </div>
+                </button>
+              );
+            })}
+            {!visibleMocs.length ? <div className="muted">No MOCs match the filters.</div> : null}
+          </div>
+        </aside>
       <main className="content">
         {selectedMoc ? <>
           <div className="panel">
-            <div className="row-between"><div><h2>{selectedMoc.name}</h2><div className="muted">{selectedMoc.url ? <a href={selectedMoc.url} target="_blank" rel="noreferrer">Open MOC URL</a> : "No URL set"}</div></div><div className="toolbar"><button className="btn" onClick={() => setEditingMoc(v=>!v)}>Edit MOC</button><button className="btn danger" onClick={handleDeleteMoc} disabled={busy}>Delete MOC</button></div></div>
-            {editingMoc ? <form className="stack" onSubmit={handleSaveMocMeta}><label><span>Name</span><input name="name" defaultValue={selectedMoc.name} /></label><label><span>URL</span><input name="url" defaultValue={selectedMoc.url || ""} /></label><div className="toolbar"><button className="btn primary" disabled={busy}>Save MOC</button><button type="button" className="btn" onClick={()=>setEditingMoc(false)}>Cancel</button></div></form> : null}
+            <div className="row-between"><div>
+                      <h2>{selectedMoc.name}</h2>
+                      <div className="muted">
+                        {(selectedMoc.build_status || "planning").replaceAll("_", " ")} • {(selectedMoc.priority || "medium").replaceAll("_", " ")}
+                      </div>
+                      <div className="muted">{selectedMoc.url ? <a href={selectedMoc.url} target="_blank" rel="noreferrer">Open MOC URL</a> : "No URL set"}</div>
+                    </div><div className="toolbar"><button className="btn" onClick={() => setEditingMoc(v=>!v)}>Edit MOC</button><button className="btn danger" onClick={handleDeleteMoc} disabled={busy}>Delete MOC</button></div></div>
+            {editingMoc ? <form className="stack" onSubmit={handleSaveMocMeta}><label><span>Name</span><input name="name" defaultValue={selectedMoc.name} /></label><label><span>URL</span><input name="url" defaultValue={selectedMoc.url || ""} /></label>
+<label><span>Build status</span><select name="buildStatus" defaultValue={selectedMoc.build_status || "planning"}>
+  <option value="planning">Planning</option>
+  <option value="collecting_parts">Collecting parts</option>
+  <option value="ready_to_build">Ready to build</option>
+  <option value="in_progress">In progress</option>
+  <option value="paused">Paused</option>
+  <option value="completed">Completed</option>
+</select></label>
+<label><span>Priority</span><select name="priority" defaultValue={selectedMoc.priority || "medium"}>
+  <option value="low">Low</option>
+  <option value="medium">Medium</option>
+  <option value="high">High</option>
+  <option value="blocker">Blocker</option>
+</select></label>
+<div className="toolbar"><button className="btn primary" disabled={busy}>Save MOC</button><button type="button" className="btn" onClick={()=>setEditingMoc(false)}>Cancel</button></div></form> : null}
+          </div>
+
+          <div className="stats">
+            <div className="panel"><div className="stat-label">Unique parts</div><div className="stat-value small-stat">{mocMetricsById[selectedMoc.id]?.totalUniqueParts || 0}</div></div>
+            <div className="panel"><div className="stat-label">Total pieces</div><div className="stat-value small-stat">{mocMetricsById[selectedMoc.id]?.totalPieces || 0}</div></div>
+            <div className="panel"><div className="stat-label">Have qty</div><div className="stat-value small-stat">{mocMetricsById[selectedMoc.id]?.haveQty || 0}</div></div>
+            <div className="panel"><div className="stat-label">Missing qty</div><div className="stat-value small-stat">{mocMetricsById[selectedMoc.id]?.missingQty || 0}</div></div>
+            <div className="panel"><div className="stat-label">Ordered qty</div><div className="stat-value small-stat">{mocMetricsById[selectedMoc.id]?.orderedQty || 0}</div></div>
+            <div className="panel"><div className="stat-label">Arrived qty</div><div className="stat-value small-stat">{mocMetricsById[selectedMoc.id]?.arrivedQty || 0}</div></div>
+            <div className="panel"><div className="stat-label">Completed lines</div><div className="stat-value small-stat">{mocMetricsById[selectedMoc.id]?.completedLines || 0}</div></div>
+            <div className="panel"><div className="stat-label">Progress</div><div className="stat-value small-stat">{mocMetricsById[selectedMoc.id]?.progressPct || 0}%</div></div>
           </div>
 
           <div className="panel">

@@ -32,14 +32,16 @@ export async function listMocs() {
   return data;
 }
 
-export async function createMoc({ name, url, sourceFileName, userId }) {
+export async function createMoc({ name, url, sourceFileName, userId, buildStatus, priority }) {
   const { data, error } = await supabase
     .from("mocs")
     .insert({
       user_id: userId,
       name,
       url: url || null,
-      source_file_name: sourceFileName || null
+      source_file_name: sourceFileName || null,
+      build_status: buildStatus || "planning",
+      priority: priority || "medium"
     })
     .select()
     .single();
@@ -51,6 +53,8 @@ export async function updateMoc(id, patch) {
   const payload = {};
   if ("name" in patch) payload.name = patch.name;
   if ("url" in patch) payload.url = patch.url || null;
+  if ("buildStatus" in patch) payload.build_status = patch.buildStatus || "planning";
+  if ("priority" in patch) payload.priority = patch.priority || "medium";
 
   const { data, error } = await supabase
     .from("mocs")

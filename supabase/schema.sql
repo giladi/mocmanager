@@ -125,3 +125,8 @@ for update to authenticated using (
       and public.orders.user_id = auth.uid()
   )
 );
+
+
+alter table public.mocs
+  add column if not exists build_status text not null default 'planning',
+  add column if not exists priority text not null default 'medium';

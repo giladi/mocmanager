@@ -141,3 +141,11 @@ Next:
 ## v17 scroll controls
 
 - Added floating Top and Bottom buttons for long pages like Buy List
+
+
+## Sprint 3.1
+
+- MOC build status
+- MOC priority
+- Dashboard filtering and sorting
+- Per-MOC planning metrics and progress
