@@ -711,7 +711,7 @@ export default function App() {
     const visibleIds = rows.flatMap((row) => row.lines.map((line) => line.partId));
     setSelectedOrderedIds((prev) => checked ? [...new Set([...prev, ...visibleIds])] : prev.filter((id) => !visibleIds.includes(id)));
   }
-  function openMocFromBuyList(mocId) { setShowBuyList(false); setShowOrders(false); setSelectedMocId(mocId); }
+  function openMocFromBuyList(mocId) { setShowBuyList(false); setShowOrders(false); setShowGlobalSearch(false); setSelectedMocId(mocId); }
 
 
   function toggleSelectedOrderDetail(partId, checked) {

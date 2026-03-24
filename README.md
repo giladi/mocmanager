@@ -171,3 +171,8 @@ Next:
 - Global search across all MOCs
 - Search by part number, color, MOC name, and notes
 - Search results can jump directly into the matching MOC
+
+
+## v22 search hotfix
+
+- Fix Search button routing so it opens the global search view
