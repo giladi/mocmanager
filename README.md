@@ -189,3 +189,10 @@ Next:
 - Modes: exact, substitute allowed, substituted
 - Substitute notes visible across parts, buy list, orders, and search
 - Substituted lines treated as resolved in MOC planning views
+
+
+## Sprint 5.1
+
+- CSV export for the selected MOC parts
+- CSV export for grouped Buy List views
+- CSV export for the currently viewed Order details

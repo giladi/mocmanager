@@ -19,6 +19,28 @@ function substituteBadgeLabel(mode) {
   return "exact";
 }
 
+
+function escapeCsv(value) {
+  const str = String(value ?? "");
+  if (/[",\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function imageCandidates(partNumber, color) {
   const code = BRICKLINK_COLOR_CODES[color];
   if (!code) return [];
@@ -195,7 +217,7 @@ function OrderEditorModal({ order, busy, onSave, onCancel, onDelete }) {
 }
 
 
-function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSelectAll, onClearSelection, onClose, onOpenMoc, onRemoveLine, onRemoveSelected, onPatchManyArrived, onUpdateOrderLine }) {
+function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSelectAll, onClearSelection, onClose, onOpenMoc, onRemoveLine, onRemoveSelected, onPatchManyArrived, onUpdateOrderLine, onExportOrder }) {
   if (!order) return null;
   const totalQty = lines.reduce((sum, line) => sum + (line.qtyOrdered || 0), 0);
   const arrivedQty = lines.reduce((sum, line) => sum + Math.min(line.qtyArrived || 0, line.qtyOrdered || 0), 0);
@@ -220,7 +242,7 @@ function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSele
               <div className="muted">{order.order_date || "No date"}{order.tracking_number ? ` • ${order.tracking_number}` : ""}</div>
               <div className="muted">{order.notes || "No notes"}</div>
             </div>
-            <button className="btn" onClick={onClose}>Close</button>
+            <div className="toolbar"><button className="btn" onClick={onExportOrder}>Export CSV</button><button className="btn" onClick={onClose}>Close</button></div>
           </div>
 
           <div className="order-summary-grid">
@@ -349,8 +371,8 @@ function groupBuyRows(allParts, orderedState, mocFilterId, ordersByPartId) {
   return rows;
 }
 
-function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, selectedIds, selectedOrderId, onToggleSelected, onSelectRow, onSelectAllVisible, onAssignSelectedToOrder, onRemoveSelectedFromOrder, onQuickAssignLine, onPatch, onPatchMany, onOpenMoc }) {
-  return <div className="panel"><h2>{title}</h2><p className="subtitle">{subtitle}</p>
+function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, selectedIds, selectedOrderId, onToggleSelected, onSelectRow, onSelectAllVisible, onAssignSelectedToOrder, onRemoveSelectedFromOrder, onQuickAssignLine, onPatch, onPatchMany, onOpenMoc, exportGroupedRows }) {
+  return <div className="panel"><div className="row-between"><h2>{title}</h2><button className="btn" onClick={() => exportGroupedRows(title, rows)}>Export CSV</button></div><p className="subtitle">{subtitle}</p>
     {mode === "ordered" ? <div className="bulk-bar">
       <div className="muted">{selectedIds.length} selected</div>
       <button className="btn" onClick={() => onSelectAllVisible(rows, true)}>Select all visible</button>
@@ -850,6 +872,82 @@ export default function App() {
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   }
 
+
+  function exportSelectedMocParts() {
+    if (!selectedMoc) return;
+    const rows = [
+      ["MOC", "Part", "Color", "Required Qty", "Have Qty", "Missing Qty", "Ordered", "Arrived", "Completed", "Substitute Mode", "Substitute Note", "Note"]
+    ];
+    for (const part of parts) {
+      rows.push([
+        selectedMoc.name,
+        part.part_number,
+        part.color,
+        part.required_qty || 0,
+        part.have_qty || 0,
+        Math.max((part.required_qty || 0) - (part.have_qty || 0), 0),
+        part.ordered ? "Yes" : "No",
+        part.arrived ? "Yes" : "No",
+        part.completed ? "Yes" : "No",
+        part.substitute_mode || "exact",
+        part.substitute_note || "",
+        part.note || ""
+      ]);
+    }
+    downloadCsv(`${selectedMoc.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_parts.csv`, rows);
+  }
+
+  function exportGroupedRowsToCsv(title, rowsData) {
+    const rows = [
+      ["View", "Part", "Color", "Total Qty", "Arrived Qty", "Pending Qty", "MOC", "Line Qty", "Ordered", "Arrived", "Substitute Mode", "Substitute Note", "Note", "Order"]
+    ];
+    for (const row of rowsData) {
+      for (const line of row.lines) {
+        rows.push([
+          title,
+          row.partNumber,
+          row.color,
+          row.totalMissing,
+          row.arrivedQty,
+          row.pendingQty,
+          line.mocName,
+          line.missing,
+          line.ordered ? "Yes" : "No",
+          line.arrived ? "Yes" : "No",
+          line.substituteMode || "exact",
+          line.substituteNote || "",
+          line.note || "",
+          line.orderName || ""
+        ]);
+      }
+    }
+    downloadCsv(`${title.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}.csv`, rows);
+  }
+
+  function exportCurrentOrder() {
+    if (!viewingOrder) return;
+    const rows = [
+      ["Order", "Vendor", "Status", "MOC", "Part", "Color", "Ordered Qty", "Arrived Qty", "Line Status", "Vendor SKU", "Substitution Note", "Part Note"]
+    ];
+    for (const line of viewingOrderLines) {
+      rows.push([
+        viewingOrder.name,
+        viewingOrder.vendor || "",
+        viewingOrder.status || "",
+        line.mocName,
+        line.partNumber,
+        line.color,
+        line.qtyOrdered || 0,
+        line.qtyArrived || 0,
+        line.lineStatus || "ordered",
+        line.vendorSku || "",
+        line.substitutionNote || "",
+        line.note || ""
+      ]);
+    }
+    downloadCsv(`${(viewingOrder.name || "order").replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_order.csv`, rows);
+  }
+
   const filteredParts = useMemo(() => parts.filter((p) => {
     const matchesSearch = !partSearch || p.part_number.toLowerCase().includes(partSearch.toLowerCase()) || p.color.toLowerCase().includes(partSearch.toLowerCase());
     const matchesColor = colorFilter === "All" || p.color === colorFilter;
@@ -953,7 +1051,7 @@ export default function App() {
 
   return <div className="page">
     <header className="header">
-      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 4.3: duplicate / substitute logic.</p></div>
+      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 5.1: CSV export.</p></div>
       <div className="toolbar">
         <button className="btn" onClick={() => { setShowBuyList(false); setShowOrders(false); setShowGlobalSearch(false); }}>Dashboard</button>
         <button className="btn" onClick={() => { setShowBuyList(true); setShowOrders(false); setShowGlobalSearch(false); }}>Buy List</button>
@@ -1049,7 +1147,7 @@ export default function App() {
                         {(selectedMoc.build_status || "planning").replaceAll("_", " ")} • {(selectedMoc.priority || "medium").replaceAll("_", " ")}
                       </div>
                       <div className="muted">{selectedMoc.url ? <a href={selectedMoc.url} target="_blank" rel="noreferrer">Open MOC URL</a> : "No URL set"}</div>
-                    </div><div className="toolbar"><button className="btn" onClick={() => setEditingMoc(v=>!v)}>Edit MOC</button><button className="btn danger" onClick={handleDeleteMoc} disabled={busy}>Delete MOC</button></div></div>
+                    </div><div className="toolbar"><button className="btn" onClick={exportSelectedMocParts}>Export CSV</button><button className="btn" onClick={() => setEditingMoc(v=>!v)}>Edit MOC</button><button className="btn danger" onClick={handleDeleteMoc} disabled={busy}>Delete MOC</button></div></div>
             {editingMoc ? <form className="stack" onSubmit={handleSaveMocMeta}><label><span>Name</span><input name="name" defaultValue={selectedMoc.name} /></label><label><span>URL</span><input name="url" defaultValue={selectedMoc.url || ""} /></label>
 <label><span>Build status</span><select name="buildStatus" defaultValue={selectedMoc.build_status || "planning"}>
   <option value="planning">Planning</option>
@@ -1095,8 +1193,8 @@ export default function App() {
       </main>
     </div> : showBuyList ? <div className="content">
       <div className="panel"><div className="row-between"><h2>Buy List</h2><div className="buy-filter"><label><span>Filter To Order by MOC</span></label><select value={buyListMocFilter} onChange={(e)=>setBuyListMocFilter(e.target.value)}><option value="all">All MOCs</option>{mocs.map((moc)=><option key={moc.id} value={moc.id}>{moc.name}</option>)}</select></div></div><p className="subtitle">Assign to orders directly here. In Ordered, you can select multiple lines, select all visible, && assign them to an order in one action.</p></div>
-      <BuyListSection title="To Order" subtitle="Any missing quantity automatically appears here until you mark it as ordered." rows={toOrderRows} mode="to_order" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onSelectAllVisible={selectAllVisibleOrdered} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
-      <BuyListSection title="Ordered" subtitle="Assign to orders directly here, line by line or in bulk." rows={orderedRows} mode="ordered" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onSelectAllVisible={selectAllVisibleOrdered} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} />
+      <BuyListSection title="To Order" subtitle="Any missing quantity automatically appears here until you mark it as ordered." rows={toOrderRows} mode="to_order" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onSelectAllVisible={selectAllVisibleOrdered} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} exportGroupedRows={exportGroupedRowsToCsv} />
+      <BuyListSection title="Ordered" subtitle="Assign to orders directly here, line by line or in bulk." rows={orderedRows} mode="ordered" mocFilterId={buyFilterValue} orders={orders} selectedIds={selectedOrderedIds} selectedOrderId={selectedOrderId} onToggleSelected={toggleSelectedOrdered} onSelectRow={selectOrderedRow} onSelectAllVisible={selectAllVisibleOrdered} onAssignSelectedToOrder={assignSelectedToOrder} onRemoveSelectedFromOrder={removeSelectedFromOrder} onQuickAssignLine={handleAssignOrder} onPatch={patchPart} onPatchMany={patchMultipleParts} onOpenMoc={openMocFromBuyList} exportGroupedRows={exportGroupedRowsToCsv} />
     </div> : <OrdersPanel orders={orders} groupedBuyRows={orderedRows} onOpenOrderEditor={setEditingOrder} onOpenOrderDetails={setViewingOrder} metricsByOrderId={metricsByOrderId} />}
     <div className="scroll-jump-controls">
       <button className="btn" onClick={scrollToTop}>Top ↑</button>
@@ -1105,7 +1203,7 @@ export default function App() {
 
     <PartEditorModal part={editingPart} busy={busy} onSave={handleSavePart} onCancel={() => setEditingPart(null)} />
     <OrderEditorModal order={editingOrder} busy={busy} onSave={handleSaveOrder} onCancel={() => setEditingOrder(null)} onDelete={handleDeleteOrder} />
-    <OrderDetailsModal order={viewingOrder} lines={viewingOrderLines} selectedIds={selectedOrderDetailIds} onToggleSelected={toggleSelectedOrderDetail} onSelectAll={() => selectAllOrderDetails(viewingOrderLines, true)} onClearSelection={() => selectAllOrderDetails(viewingOrderLines, false)} onClose={() => setViewingOrder(null)} onOpenMoc={openMocFromBuyList} onRemoveLine={handleRemoveFromOrder} onRemoveSelected={removeSelectedFromViewingOrder} onPatchManyArrived={patchManyViewingOrderArrived} onUpdateOrderLine={patchViewingOrderItemField} />
+    <OrderDetailsModal order={viewingOrder} lines={viewingOrderLines} selectedIds={selectedOrderDetailIds} onToggleSelected={toggleSelectedOrderDetail} onSelectAll={() => selectAllOrderDetails(viewingOrderLines, true)} onClearSelection={() => selectAllOrderDetails(viewingOrderLines, false)} onClose={() => setViewingOrder(null)} onOpenMoc={openMocFromBuyList} onRemoveLine={handleRemoveFromOrder} onRemoveSelected={removeSelectedFromViewingOrder} onPatchManyArrived={patchManyViewingOrderArrived} onUpdateOrderLine={patchViewingOrderItemField} onExportOrder={exportCurrentOrder} />
     <ImportPreviewModal preview={csvPreview} busy={busy} onCancel={() => setCsvPreview(null)} onConfirm={confirmImportCsv} />
   </div>;
 }
