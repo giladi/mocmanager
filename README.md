@@ -236,3 +236,9 @@ Next:
 
 - Align header and saved views panel width with the main content area
 - Fix top-section container width mismatch
+
+
+## v32 layout overflow fix
+
+- Constrained the dashboard grid to prevent the lower content area from stretching wider than the header
+- Main content column now uses minmax(0, 1fr) to avoid overflow
