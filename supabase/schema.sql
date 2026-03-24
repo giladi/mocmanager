@@ -139,3 +139,31 @@ alter table public.moc_parts
 alter table public.moc_parts
   add column if not exists substitute_mode text not null default 'exact',
   add column if not exists substitute_note text;
+
+
+create table if not exists public.saved_views (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  view_type text not null default 'dashboard',
+  config jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.saved_views enable row level security;
+
+drop policy if exists saved_views_select_own on public.saved_views;
+create policy saved_views_select_own on public.saved_views
+for select to authenticated using (auth.uid() = user_id);
+
+drop policy if exists saved_views_insert_own on public.saved_views;
+create policy saved_views_insert_own on public.saved_views
+for insert to authenticated with check (auth.uid() = user_id);
+
+drop policy if exists saved_views_update_own on public.saved_views;
+create policy saved_views_update_own on public.saved_views
+for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists saved_views_delete_own on public.saved_views;
+create policy saved_views_delete_own on public.saved_views
+for delete to authenticated using (auth.uid() = user_id);

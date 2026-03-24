@@ -196,3 +196,11 @@ Next:
 - CSV export for the selected MOC parts
 - CSV export for grouped Buy List views
 - CSV export for the currently viewed Order details
+
+
+## Sprint 5.2
+
+- Saved views / filters
+- Save current view state
+- Load saved views
+- Delete saved views

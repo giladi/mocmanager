@@ -232,3 +232,33 @@ export async function removePartFromOrder(orderId, mocPartId) {
     .eq("moc_part_id", mocPartId);
   if (error) throw error;
 }
+
+
+export async function listSavedViews() {
+  const { data, error } = await supabase
+    .from("saved_views")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function createSavedView({ name, viewType, config, userId }) {
+  const { data, error } = await supabase
+    .from("saved_views")
+    .insert({
+      user_id: userId,
+      name,
+      view_type: viewType || "dashboard",
+      config: config || {}
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteSavedView(id) {
+  const { error } = await supabase.from("saved_views").delete().eq("id", id);
+  if (error) throw error;
+}

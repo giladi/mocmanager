@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  addPartToOrder, createMoc, createOrder, createPart, deleteMoc, deleteOrder, deletePart,
-  getSession, listAllPartsForUser, listMocParts, listMocs, listOrders, removePartFromOrder,
+  addPartToOrder, createMoc, createOrder, createPart, createSavedView, deleteMoc, deleteOrder, deletePart, deleteSavedView,
+  getSession, listAllPartsForUser, listMocParts, listMocs, listOrders, listSavedViews, removePartFromOrder,
   signIn, signOut, signUp, updateMoc, updateOrder, updateOrderItem, updatePart
 } from "./lib/api";
 import { supabase } from "./lib/supabase";
@@ -432,6 +432,31 @@ function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, sele
 
 
 
+
+function SavedViewsPanel({ savedViews, onApply, onDelete, onSaveCurrent }) {
+  return (
+    <div className="panel saved-views-panel">
+      <div className="row-between">
+        <h3>Saved views</h3>
+        <button className="btn" onClick={onSaveCurrent}>Save current view</button>
+      </div>
+      {!savedViews.length ? (
+        <div className="muted">No saved views yet.</div>
+      ) : (
+        <div className="saved-views-list">
+          {savedViews.map((view) => (
+            <div key={view.id} className="saved-view-item">
+              <button className="link-button" onClick={() => onApply(view)}>{view.name}</button>
+              <div className="muted">{view.view_type}</div>
+              <button className="btn small danger" onClick={() => onDelete(view.id)}>Delete</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GlobalSearchPanel({ query, setQuery, results, onOpenMoc }) {
   return <div className="content">
     <div className="panel">
@@ -535,7 +560,7 @@ function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDet
 
 
 export default function App() {
-  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]), [mocStatusFilter, setMocStatusFilter] = useState("all"), [mocPriorityFilter, setMocPriorityFilter] = useState("all"), [mocSort, setMocSort] = useState("name"), [showGlobalSearch, setShowGlobalSearch] = useState(false), [globalSearch, setGlobalSearch] = useState("");
+  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]), [mocStatusFilter, setMocStatusFilter] = useState("all"), [mocPriorityFilter, setMocPriorityFilter] = useState("all"), [mocSort, setMocSort] = useState("name"), [showGlobalSearch, setShowGlobalSearch] = useState(false), [globalSearch, setGlobalSearch] = useState(""), [savedViews, setSavedViews] = useState([]);
   const selectedMoc = useMemo(() => mocs.find((m) => m.id === selectedMocId) || null, [mocs, selectedMocId]);
   const mocMetricsById = useMemo(() => {
     const map = {};
@@ -640,7 +665,7 @@ export default function App() {
     return () => { mounted = false; data.subscription.unsubscribe(); };
   }, []);
 
-  useEffect(() => { if (session?.user) { refreshMocs(); refreshAllParts(); refreshOrders(); } }, [session?.user?.id]);
+  useEffect(() => { if (session?.user) { refreshMocs(); refreshAllParts(); refreshOrders(); refreshSavedViews(); } }, [session?.user?.id]);
   useEffect(() => { if (selectedMocId) { setPartSearch(""); setColorFilter("All"); setSortField("part"); setSortDir("asc"); refreshParts(selectedMocId); } else setParts([]); }, [selectedMocId]);
   useEffect(() => { if (!showBuyList) { setSelectedOrderedIds([]); setSelectedOrderId(""); } }, [showBuyList]);
   useEffect(() => {
@@ -659,6 +684,7 @@ export default function App() {
   async function refreshParts(mocId) { try { setParts(await listMocParts(mocId)); } catch (err) { setError(err.message || "Could not load parts."); } }
   async function refreshAllParts() { try { setAllParts(await listAllPartsForUser()); } catch (err) { setError(err.message || "Could not load buy list."); } }
   async function refreshOrders() { try { setOrders(await listOrders()); } catch (err) { setError(err.message || "Could not load orders."); } }
+  async function refreshSavedViews() { try { setSavedViews(await listSavedViews()); } catch (err) { setError(err.message || "Could not load saved views."); } }
 
   function getMissingQtyForPart(partId) {
     const part = allParts.find((p) => p.id === partId);
@@ -948,6 +974,73 @@ export default function App() {
     downloadCsv(`${(viewingOrder.name || "order").replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_order.csv`, rows);
   }
 
+
+  function getCurrentViewType() {
+    if (showGlobalSearch) return "search";
+    if (showBuyList) return "buylist";
+    if (showOrders) return "orders";
+    return "dashboard";
+  }
+
+  function getCurrentViewConfig() {
+    return {
+      mocStatusFilter,
+      mocPriorityFilter,
+      mocSort,
+      buyListMocFilter,
+      globalSearch
+    };
+  }
+
+  async function handleSaveCurrentView() {
+    const name = window.prompt("Saved view name:");
+    if (!name?.trim() || !session?.user) return;
+    try {
+      setBusy(true);
+      await createSavedView({
+        name: name.trim(),
+        viewType: getCurrentViewType(),
+        config: getCurrentViewConfig(),
+        userId: session.user.id
+      });
+      await refreshSavedViews();
+    } catch (err) {
+      setError(err.message || "Could not save view.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function applySavedView(view) {
+    const cfg = view.config || {};
+    setMocStatusFilter(cfg.mocStatusFilter || "all");
+    setMocPriorityFilter(cfg.mocPriorityFilter || "all");
+    setMocSort(cfg.mocSort || "name");
+    setBuyListMocFilter(cfg.buyListMocFilter || "all");
+    setGlobalSearch(cfg.globalSearch || "");
+
+    setShowGlobalSearch(view.view_type === "search");
+    setShowBuyList(view.view_type === "buylist");
+    setShowOrders(view.view_type === "orders");
+    if (view.view_type === "dashboard") {
+      setShowGlobalSearch(false)
+      setShowBuyList(false);
+      setShowOrders(false);
+    }
+  }
+
+  async function handleDeleteSavedView(id) {
+    try {
+      setBusy(true);
+      await deleteSavedView(id);
+      await refreshSavedViews();
+    } catch (err) {
+      setError(err.message || "Could not delete saved view.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const filteredParts = useMemo(() => parts.filter((p) => {
     const matchesSearch = !partSearch || p.part_number.toLowerCase().includes(partSearch.toLowerCase()) || p.color.toLowerCase().includes(partSearch.toLowerCase());
     const matchesColor = colorFilter === "All" || p.color === colorFilter;
@@ -1051,7 +1144,7 @@ export default function App() {
 
   return <div className="page">
     <header className="header">
-      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 5.1: CSV export.</p></div>
+      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 5.2: saved views / filters.</p></div>
       <div className="toolbar">
         <button className="btn" onClick={() => { setShowBuyList(false); setShowOrders(false); setShowGlobalSearch(false); }}>Dashboard</button>
         <button className="btn" onClick={() => { setShowBuyList(true); setShowOrders(false); setShowGlobalSearch(false); }}>Buy List</button>
@@ -1063,6 +1156,8 @@ export default function App() {
       </div>
     </header>
     {error ? <div className="error-banner">{error}</div> : null}
+
+    <SavedViewsPanel savedViews={savedViews} onApply={applySavedView} onDelete={handleDeleteSavedView} onSaveCurrent={handleSaveCurrentView} />
 
     {showGlobalSearch ? <GlobalSearchPanel query={globalSearch} setQuery={setGlobalSearch} results={globalSearchResults} onOpenMoc={openMocFromBuyList} /> : !showBuyList && !showOrders ? <div className="layout">
       <aside className="sidebar panel">
