@@ -134,3 +134,8 @@ alter table public.mocs
 
 alter table public.moc_parts
   add column if not exists note text;
+
+
+alter table public.moc_parts
+  add column if not exists substitute_mode text not null default 'exact',
+  add column if not exists substitute_note text;

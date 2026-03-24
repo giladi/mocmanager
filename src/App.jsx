@@ -13,6 +13,12 @@ const brickLinkSearchUrl = (partNumber) => `https://www.bricklink.com/v2/search.
 const brickOwlSearchUrl = (partNumber, color) => `https://www.brickowl.com/search/catalog?query=${encodeURIComponent(`${partNumber} ${color}`)}`;
 const rebrickableSearchUrl = (partNumber) => `https://rebrickable.com/parts/?q=${encodeURIComponent(partNumber)}`;
 
+function substituteBadgeLabel(mode) {
+  if (mode === "substitute_allowed") return "substitute allowed";
+  if (mode === "substituted") return "substituted";
+  return "exact";
+}
+
 function imageCandidates(partNumber, color) {
   const code = BRICKLINK_COLOR_CODES[color];
   if (!code) return [];
@@ -157,6 +163,12 @@ function PartEditorModal({ part, busy, onSave, onCancel }) {
       <label className="checkbox"><input name="arrived" type="checkbox" defaultChecked={!!part.arrived} /><span>Arrived</span></label>
       <label className="checkbox"><input name="completed" type="checkbox" defaultChecked={!!part.completed} /><span>Completed</span></label>
       <label><span>Note</span><input name="note" defaultValue={part.note || ""} placeholder="Optional note about collection, build, substitution, drawer, etc." /></label>
+      <label><span>Substitute mode</span><select name="substituteMode" defaultValue={part.substitute_mode || "exact"}>
+        <option value="exact">Exact required</option>
+        <option value="substitute_allowed">Substitute allowed</option>
+        <option value="substituted">Substituted</option>
+      </select></label>
+      <label><span>Substitute note</span><input name="substituteNote" defaultValue={part.substitute_note || ""} placeholder="How/why this part can be substituted" /></label>
       <div className="toolbar"><button className="btn primary" disabled={busy}>Save</button><button type="button" className="btn" onClick={onCancel}>Cancel</button></div>
     </form>
   </ModalShell>;
@@ -235,7 +247,7 @@ function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSele
             {!lines.length ? <div className="muted">No lines assigned to this order.</div> : (
               <div className="table-wrap order-lines-wrap">
                 <table>
-                  <thead><tr><th></th><th>MOC</th><th>Part</th><th>Color</th><th>Part note</th><th>Ordered</th><th>Arrived</th><th>Status</th><th>Vendor SKU</th><th>Substitution / Note</th><th></th></tr></thead>
+                  <thead><tr><th></th><th>MOC</th><th>Part</th><th>Color</th><th>Part note</th><th>Substitute</th><th>Ordered</th><th>Arrived</th><th>Status</th><th>Vendor SKU</th><th>Substitution / Note</th><th></th></tr></thead>
                   <tbody>
                     {lines.map((line) => {
                       const disableArrived = line.lineStatus === "cancelled";
@@ -246,6 +258,10 @@ function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSele
                           <td>{line.partNumber}</td>
                           <td>{line.color}</td>
                           <td>{line.note ? <span className="part-note-inline">📝 {line.note}</span> : <span className="muted">—</span>}</td>
+                          <td>
+                            <span className={`pill substitute-${line.substituteMode || "exact"}`}>{substituteBadgeLabel(line.substituteMode || "exact")}</span>
+                            {line.substituteNote ? <div className="sub-note-inline">{line.substituteNote}</div> : null}
+                          </td>
                           <td><input className="inline-number" type="number" min="0" value={line.qtyOrdered} onChange={(e) => onUpdateOrderLine(line.partId, { qtyOrdered: Math.max(0, Number(e.target.value || 0)) })} /></td>
                           <td><input className="inline-number" type="number" min="0" max={line.qtyOrdered} disabled={disableArrived} value={line.qtyArrived} onChange={(e) => onUpdateOrderLine(line.partId, { qtyArrived: Math.max(0, Number(e.target.value || 0)) })} /></td>
                           <td>
@@ -278,7 +294,7 @@ function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSele
 
 function PartTable({ parts, onEdit, onDelete, onPatch }) {
   if (!parts.length) return <div className="muted">No parts here.</div>;
-  return <div className="table-wrap"><table><thead><tr><th>Image</th><th>Part</th><th>Color</th><th>Need</th><th>Have</th><th>Missing</th><th>Note</th><th>Ordered</th><th>Arrived</th><th>Completed</th><th></th></tr></thead><tbody>
+  return <div className="table-wrap"><table><thead><tr><th>Image</th><th>Part</th><th>Color</th><th>Need</th><th>Have</th><th>Missing</th><th>Substitute</th><th>Note</th><th>Ordered</th><th>Arrived</th><th>Completed</th><th></th></tr></thead><tbody>
     {parts.map((part) => {
       const missing = Math.max(part.required_qty - part.have_qty, 0);
       return <tr key={part.id}>
@@ -287,6 +303,14 @@ function PartTable({ parts, onEdit, onDelete, onPatch }) {
         <td>{part.color}</td><td>{part.required_qty}</td>
         <td><input className="inline-number" type="number" min="0" value={part.have_qty} onChange={(e)=>onPatch(part.id, { haveQty: Math.max(0, Number(e.target.value || 0)) })} /></td>
         <td>{missing}</td>
+        <td className="substitute-cell">
+          <select value={part.substitute_mode || "exact"} onChange={(e)=>onPatch(part.id, { substituteMode: e.target.value })}>
+            <option value="exact">Exact</option>
+            <option value="substitute_allowed">Allowed</option>
+            <option value="substituted">Substituted</option>
+          </select>
+          {part.substitute_note ? <div className="sub-note-inline">{part.substitute_note}</div> : null}
+        </td>
         <td className="note-cell">
           <input className="note-input" type="text" value={part.note || ""} placeholder="Add note" onChange={(e)=>onPatch(part.id, { note: e.target.value })} />
         </td>
@@ -303,7 +327,7 @@ function groupBuyRows(allParts, orderedState, mocFilterId, ordersByPartId) {
   const grouped = new Map();
   for (const part of allParts) {
     const missing = Math.max(part.required_qty - part.have_qty, 0);
-    if (part.completed || missing <= 0) continue;
+    if (part.completed || part.substitute_mode === "substituted" || missing <= 0) continue;
     if (orderedState === "to_order" && part.ordered) continue;
     if (orderedState === "ordered" && !part.ordered) continue;
     const belongsToFilteredMoc = !mocFilterId || part.mocs?.id === mocFilterId;
@@ -315,7 +339,7 @@ function groupBuyRows(allParts, orderedState, mocFilterId, ordersByPartId) {
     if (belongsToFilteredMoc) row.matchesFilter = true;
     row.lines.push({
       partId: part.id, mocId: part.mocs?.id || "", mocName: part.mocs?.name || "MOC", mocUrl: part.mocs?.url || "",
-      partNumber: part.part_number, color: part.color, note: part.note || "",
+      partNumber: part.part_number, color: part.color, note: part.note || "", substituteMode: part.substitute_mode || "exact", substituteNote: part.substitute_note || "",
       missing, ordered: !!part.ordered, arrived: !!part.arrived, belongsToFilteredMoc,
       orderName: ordersByPartId[part.id]?.orderName || "", orderId: ordersByPartId[part.id]?.orderId || ""
     });
@@ -365,6 +389,10 @@ function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, sele
             <div className="buy-line-text">
               <div className="buy-line-title"><button className="link-button" onClick={()=>onOpenMoc(line.mocId)}>{line.mocName}</button><span> — Qty {line.missing}</span>{line.mocUrl ? <> — <a href={line.mocUrl} target="_blank" rel="noreferrer">URL</a></> : null}</div>
               <div className="muted">{mode === "to_order" ? (line.ordered ? "Marked as ordered" : "Still to order") : (line.arrived ? "Arrived" : "Pending arrival")}{mocFilterId && !line.belongsToFilteredMoc ? " • also needed by another MOC" : ""}{line.orderName ? ` • ${line.orderName}` : ""}</div>
+              <div className="buy-line-meta">
+                <span className={`pill substitute-${line.substituteMode || "exact"}`}>{substituteBadgeLabel(line.substituteMode || "exact")}</span>
+                {line.substituteNote ? <span className="sub-note-inline">{line.substituteNote}</span> : null}
+              </div>
               {line.note ? <div className="part-note-inline">📝 {line.note}</div> : null}
               {mode === "ordered" ? <div className="inline-order-assign">
                 <select value={line.orderId || ""} onChange={(e) => onQuickAssignLine(line.partId, line.orderId, e.target.value)}>
@@ -416,6 +444,7 @@ function GlobalSearchPanel({ query, setQuery, results, onOpenMoc }) {
                   <th>Missing</th>
                   <th>Ordered</th>
                   <th>Arrived</th>
+                  <th>Substitute</th>
                   <th>Note</th>
                 </tr>
               </thead>
@@ -430,6 +459,10 @@ function GlobalSearchPanel({ query, setQuery, results, onOpenMoc }) {
                     <td>{row.missingQty}</td>
                     <td>{row.ordered ? "Yes" : "No"}</td>
                     <td>{row.arrived ? "Yes" : "No"}</td>
+                    <td>
+                      <span className={`pill substitute-${row.substituteMode || "exact"}`}>{substituteBadgeLabel(row.substituteMode || "exact")}</span>
+                      {row.substituteNote ? <div className="sub-note-inline">{row.substituteNote}</div> : null}
+                    </td>
                     <td>{row.note ? <span className="part-note-inline">📝 {row.note}</span> : <span className="muted">—</span>}</td>
                   </tr>
                 ))}
@@ -489,11 +522,11 @@ export default function App() {
       const totalUniqueParts = mocParts.length;
       const totalPieces = mocParts.reduce((sum, p) => sum + (p.required_qty || 0), 0);
       const haveQty = mocParts.reduce((sum, p) => sum + Math.min(p.have_qty || 0, p.required_qty || 0), 0);
-      const missingQty = mocParts.reduce((sum, p) => sum + Math.max((p.required_qty || 0) - (p.have_qty || 0), 0), 0);
-      const orderedQty = mocParts.filter((p) => p.ordered).reduce((sum, p) => sum + Math.max((p.required_qty || 0) - (p.have_qty || 0), 0), 0);
-      const arrivedQty = mocParts.filter((p) => p.arrived).reduce((sum, p) => sum + Math.max((p.required_qty || 0) - (p.have_qty || 0), 0), 0);
-      const completedLines = mocParts.filter((p) => p.completed).length;
-      const progressPct = totalPieces > 0 ? Math.round((haveQty / totalPieces) * 100) : 0;
+      const missingQty = mocParts.filter((p) => p.substitute_mode !== "substituted").reduce((sum, p) => sum + Math.max((p.required_qty || 0) - (p.have_qty || 0), 0), 0);
+      const orderedQty = mocParts.filter((p) => p.substitute_mode !== "substituted" && p.ordered).reduce((sum, p) => sum + Math.max((p.required_qty || 0) - (p.have_qty || 0), 0), 0);
+      const arrivedQty = mocParts.filter((p) => p.substitute_mode !== "substituted" && p.arrived).reduce((sum, p) => sum + Math.max((p.required_qty || 0) - (p.have_qty || 0), 0), 0);
+      const completedLines = mocParts.filter((p) => p.completed || p.substitute_mode === "substituted").length;
+      const substitutedQty = mocParts.filter((p) => p.substitute_mode === "substituted").reduce((sum, p) => sum + (p.required_qty || 0), 0); const progressPct = totalPieces > 0 ? Math.round(((haveQty + substitutedQty) / totalPieces) * 100) : 0;
       map[moc.id] = { totalUniqueParts, totalPieces, haveQty, missingQty, orderedQty, arrivedQty, completedLines, progressPct };
     }
     return map;
@@ -546,7 +579,9 @@ export default function App() {
         missingQty: Math.max((part.required_qty || 0) - (part.have_qty || 0), 0),
         ordered: !!part.ordered,
         arrived: !!part.arrived,
-        note: part.note || ""
+        note: part.note || "",
+        substituteMode: part.substitute_mode || "exact",
+        substituteNote: part.substitute_note || ""
       }))
       .sort((a, b) =>
         a.partNumber.localeCompare(b.partNumber) ||
@@ -833,9 +868,9 @@ export default function App() {
     return items;
   }, [filteredParts, sortField, sortDir]);
 
-  const activeParts = sortedParts.filter((p) => !p.completed && !(p.ordered && p.required_qty - p.have_qty > 0));
-  const orderedParts = sortedParts.filter((p) => !p.completed && p.ordered && p.required_qty - p.have_qty > 0);
-  const completedParts = sortedParts.filter((p) => p.completed);
+  const activeParts = sortedParts.filter((p) => !p.completed && p.substitute_mode !== "substituted" && !(p.ordered && p.required_qty - p.have_qty > 0));
+  const orderedParts = sortedParts.filter((p) => !p.completed && p.substitute_mode !== "substituted" && p.ordered && p.required_qty - p.have_qty > 0);
+  const completedParts = sortedParts.filter((p) => p.completed || p.substitute_mode === "substituted");
   const colors = [...new Set(parts.map((p) => p.color))].sort();
   const buyFilterValue = buyListMocFilter === "all" ? null : buyListMocFilter;
   const toOrderRows = useMemo(() => groupBuyRows(allParts, "to_order", buyFilterValue, ordersByPartId), [allParts, buyFilterValue, ordersByPartId]);
@@ -899,6 +934,8 @@ export default function App() {
           partNumber: part.part_number,
           color: part.color,
           note: part.note || "",
+          substituteMode: part.substitute_mode || "exact",
+          substituteNote: part.substitute_note || "",
           missing,
           qtyOrdered,
           qtyArrived,
@@ -916,7 +953,7 @@ export default function App() {
 
   return <div className="page">
     <header className="header">
-      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 4.2: search across all MOCs.</p></div>
+      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 4.3: duplicate / substitute logic.</p></div>
       <div className="toolbar">
         <button className="btn" onClick={() => { setShowBuyList(false); setShowOrders(false); setShowGlobalSearch(false); }}>Dashboard</button>
         <button className="btn" onClick={() => { setShowBuyList(true); setShowOrders(false); setShowGlobalSearch(false); }}>Buy List</button>

@@ -102,7 +102,9 @@ export async function createPart(mocId, part) {
       ordered: !!part.ordered,
       arrived: !!part.arrived,
       completed: !!part.completed,
-      note: part.note || null
+      note: part.note || null,
+      substitute_mode: part.substituteMode || "exact",
+      substitute_note: part.substituteNote || null
     })
     .select()
     .single();
@@ -120,6 +122,8 @@ export async function updatePart(id, patch) {
   if ("arrived" in patch) payload.arrived = patch.arrived;
   if ("completed" in patch) payload.completed = patch.completed;
   if ("note" in patch) payload.note = patch.note || null;
+  if ("substituteMode" in patch) payload.substitute_mode = patch.substituteMode || "exact";
+  if ("substituteNote" in patch) payload.substitute_note = patch.substituteNote || null;
 
   const { data, error } = await supabase
     .from("moc_parts")

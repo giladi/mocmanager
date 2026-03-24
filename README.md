@@ -181,3 +181,11 @@ Next:
 ## v23 search render fix
 
 - Fixed top-level render logic so Search view is shown before Dashboard
+
+
+## Sprint 4.3
+
+- Part-level duplicate/substitute logic
+- Modes: exact, substitute allowed, substituted
+- Substitute notes visible across parts, buy list, orders, and search
+- Substituted lines treated as resolved in MOC planning views
