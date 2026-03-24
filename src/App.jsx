@@ -686,6 +686,12 @@ export default function App() {
   async function refreshOrders() { try { setOrders(await listOrders()); } catch (err) { setError(err.message || "Could not load orders."); } }
   async function refreshSavedViews() { try { setSavedViews(await listSavedViews()); } catch (err) { setError(err.message || "Could not load saved views."); } }
 
+  function openView(viewType) {
+    setShowGlobalSearch(viewType === "search");
+    setShowBuyList(viewType === "buylist");
+    setShowOrders(viewType === "orders");
+  }
+
   function getMissingQtyForPart(partId) {
     const part = allParts.find((p) => p.id === partId);
     return part ? Math.max(part.required_qty - part.have_qty, 0) : 0;
@@ -794,7 +800,7 @@ export default function App() {
     const visibleIds = rows.flatMap((row) => row.lines.map((line) => line.partId));
     setSelectedOrderedIds((prev) => checked ? [...new Set([...prev, ...visibleIds])] : prev.filter((id) => !visibleIds.includes(id)));
   }
-  function openMocFromBuyList(mocId) { setShowBuyList(false); setShowOrders(false); setShowGlobalSearch(false); setSelectedMocId(mocId); }
+  function openMocFromBuyList(mocId) { openView("dashboard"); setSelectedMocId(mocId); }
 
 
   function toggleSelectedOrderDetail(partId, checked) {
@@ -1018,24 +1024,7 @@ export default function App() {
     setMocSort(cfg.mocSort || "name");
     setBuyListMocFilter(cfg.buyListMocFilter || "all");
     setGlobalSearch(cfg.globalSearch || "");
-
-    if (view.view_type === "search") {
-      setShowGlobalSearch(true);
-      setShowBuyList(false);
-      setShowOrders(false);
-    } else if (view.view_type === "buylist") {
-      setShowGlobalSearch(false);
-      setShowBuyList(true);
-      setShowOrders(false);
-    } else if (view.view_type === "orders") {
-      setShowGlobalSearch(false);
-      setShowBuyList(false);
-      setShowOrders(true);
-    } else {
-      setShowGlobalSearch(false);
-      setShowBuyList(false);
-      setShowOrders(false);
-    }
+    openView(view.view_type || "dashboard");
   }
 
   async function handleDeleteSavedView(id) {
@@ -1155,10 +1144,10 @@ export default function App() {
     <header className="header">
       <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 5.2: saved views / filters.</p></div>
       <div className="toolbar">
-        <button className="btn" onClick={() => { setShowBuyList(false); setShowOrders(false); setShowGlobalSearch(false); }}>Dashboard</button>
-        <button className="btn" onClick={() => { setShowBuyList(true); setShowOrders(false); setShowGlobalSearch(false); }}>Buy List</button>
-        <button className="btn" onClick={() => { setShowOrders(true); setShowBuyList(false); setShowGlobalSearch(false); }}>Orders</button>
-        <button className="btn" onClick={() => { setShowGlobalSearch(true); setShowBuyList(false); setShowOrders(false); }}>Search</button>
+        <button className="btn" onClick={() => openView("dashboard")}>Dashboard</button>
+        <button className="btn" onClick={() => openView("buylist")}>Buy List</button>
+        <button className="btn" onClick={() => openView("orders")}>Orders</button>
+        <button className="btn" onClick={() => openView("search")}>Search</button>
         <button className="btn primary" onClick={handleCreateMoc} disabled={busy}>New MOC</button>
         <label className="btn">Import CSV<input type="file" accept=".csv,text/csv" style={{ display:"none" }} onChange={(e)=>{ const file = e.target.files?.[0]; if (file) handleImportCsv(file); e.target.value = ""; }} /></label>
         <button className="btn" onClick={() => signOut()}>Sign out</button>

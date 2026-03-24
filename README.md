@@ -209,3 +209,9 @@ Next:
 ## v27 saved view hotfix
 
 - Fix applying saved views so the app switches to the saved screen type correctly
+
+
+## v28 nav hotfix
+
+- Added a shared openView helper for top-nav and saved views
+- Saved views now use the same screen-switching path as manual navigation
