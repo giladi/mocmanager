@@ -204,3 +204,8 @@ Next:
 - Save current view state
 - Load saved views
 - Delete saved views
+
+
+## v27 saved view hotfix
+
+- Fix applying saved views so the app switches to the saved screen type correctly

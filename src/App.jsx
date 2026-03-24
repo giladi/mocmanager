@@ -1019,11 +1019,20 @@ export default function App() {
     setBuyListMocFilter(cfg.buyListMocFilter || "all");
     setGlobalSearch(cfg.globalSearch || "");
 
-    setShowGlobalSearch(view.view_type === "search");
-    setShowBuyList(view.view_type === "buylist");
-    setShowOrders(view.view_type === "orders");
-    if (view.view_type === "dashboard") {
-      setShowGlobalSearch(false)
+    if (view.view_type === "search") {
+      setShowGlobalSearch(true);
+      setShowBuyList(false);
+      setShowOrders(false);
+    } else if (view.view_type === "buylist") {
+      setShowGlobalSearch(false);
+      setShowBuyList(true);
+      setShowOrders(false);
+    } else if (view.view_type === "orders") {
+      setShowGlobalSearch(false);
+      setShowBuyList(false);
+      setShowOrders(true);
+    } else {
+      setShowGlobalSearch(false);
       setShowBuyList(false);
       setShowOrders(false);
     }
