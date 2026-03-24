@@ -56,10 +56,10 @@ function PartImage({ partNumber, color }) {
   const [index, setIndex] = useState(0);
   const [failed, setFailed] = useState(candidates.length === 0);
   useEffect(() => { setIndex(0); setFailed(candidates.length === 0); }, [partNumber, color, candidates.length]);
-  if (failed) return <div className="part-image-fallback"><div>No image</div></div>;
-  return <img className="part-image" src={candidates[index]} alt={`${partNumber} ${color}`} onError={() => {
+  if (failed) return <div className="part-image-frame"><div className="part-image-fallback"><div>No image</div></div></div>;
+  return <div className="part-image-frame"><img className="part-image" src={candidates[index]} alt={`${partNumber} ${color}`} onError={() => {
     if (index < candidates.length - 1) setIndex(i => i + 1); else setFailed(true);
-  }} />;
+  }} /></div>;
 }
 
 function parseCSV(text) {
@@ -315,7 +315,7 @@ function OrderDetailsModal({ order, lines, selectedIds, onToggleSelected, onSele
 
 
 function PartTable({ parts, onEdit, onDelete, onPatch }) {
-  if (!parts.length) return <div className="muted">No parts here.</div>;
+  if (!parts.length) return <div className="muted">No parts in this section.</div>;
   return <div className="table-wrap"><table><thead><tr><th>Image</th><th>Part</th><th>Color</th><th>Need</th><th>Have</th><th>Missing</th><th>Substitute</th><th>Note</th><th>Ordered</th><th>Arrived</th><th>Completed</th><th></th></tr></thead><tbody>
     {parts.map((part) => {
       const missing = Math.max(part.required_qty - part.have_qty, 0);
@@ -437,7 +437,7 @@ function SavedViewsPanel({ savedViews, onApply, onDelete, onSaveCurrent }) {
   return (
     <div className="panel saved-views-panel">
       <div className="row-between">
-        <h3>Saved views</h3>
+        <h3>Saved views</h3><div className="muted">Reuse common working setups without rebuilding the same filters.</div>
         <button className="btn" onClick={onSaveCurrent}>Save current view</button>
       </div>
       {!savedViews.length ? (
@@ -475,7 +475,7 @@ function GlobalSearchPanel({ query, setQuery, results, onOpenMoc }) {
     {query.trim() ? (
       <div className="panel">
         <div className="row-between">
-          <h3>Results</h3>
+          <h3>Results</h3><div className="muted">Click a MOC name to jump directly into that project.</div>
           <div className="muted">{results.length} matches</div>
         </div>
         {!results.length ? <div className="muted">No matches found.</div> : (
@@ -519,7 +519,7 @@ function GlobalSearchPanel({ query, setQuery, results, onOpenMoc }) {
         )}
       </div>
     ) : (
-      <div className="panel"><div className="muted">Start typing to search across all MOCs.</div></div>
+      <div className="panel"><div className="muted">Start typing to search across all MOCs by part, color, note, or MOC name.</div></div>
     )}
   </div>;
 }
@@ -528,7 +528,7 @@ function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDet
   return <div className="panel">
     <div className="row-between"><h2>Orders</h2><button className="btn primary" onClick={() => onOpenOrderEditor({ status:"draft" })}>Create order</button></div>
     <p className="subtitle">Orders page is summary-focused. Open an order to inspect its assigned lines.</p>
-    {!orders.length ? <div className="muted">No orders yet.</div> : <div className="orders-grid">{orders.map((order) => {
+    {!orders.length ? <div className="muted">No orders yet. Create one when you are ready to group sourced parts.</div> : <div className="orders-grid">{orders.map((order) => {
       const metrics = metricsByOrderId[order.id] || { lines: 0, totalQty: 0, arrivedQty: 0, resolvedQty: 0, pendingQty: 0, allResolved: false };
       return <div key={order.id} className="order-card">
         <div className="row-between">
@@ -560,7 +560,7 @@ function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDet
 
 
 export default function App() {
-  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]), [mocStatusFilter, setMocStatusFilter] = useState("all"), [mocPriorityFilter, setMocPriorityFilter] = useState("all"), [mocSort, setMocSort] = useState("name"), [showGlobalSearch, setShowGlobalSearch] = useState(false), [globalSearch, setGlobalSearch] = useState(""), [savedViews, setSavedViews] = useState([]);
+  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]), [mocStatusFilter, setMocStatusFilter] = useState("all"), [mocPriorityFilter, setMocPriorityFilter] = useState("all"), [mocSort, setMocSort] = useState("name"), [showGlobalSearch, setShowGlobalSearch] = useState(false), [globalSearch, setGlobalSearch] = useState(""), [savedViews, setSavedViews] = useState([]), [displayDensity, setDisplayDensity] = useState("comfortable");
   const selectedMoc = useMemo(() => mocs.find((m) => m.id === selectedMocId) || null, [mocs, selectedMocId]);
   const mocMetricsById = useMemo(() => {
     const map = {};
@@ -1140,13 +1140,17 @@ export default function App() {
   if (loadingSession) return <div className="page centered"><div className="panel">Loading…</div></div>;
   if (!session?.user) return <AuthScreen onAuthed={async ()=>setSession(await getSession())} />;
 
-  return <div className="page">
+  return <div className={`page density-${displayDensity}`}>
     <header className="header">
-      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 5.2: saved views / filters.</p></div>
+      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 5.3: image and visual improvements.</p></div>
       <div className="toolbar">
         <button className="btn" onClick={() => openView("dashboard")}>Dashboard</button>
         <button className="btn" onClick={() => openView("buylist")}>Buy List</button>
         <button className="btn" onClick={() => openView("orders")}>Orders</button>
+        <select value={displayDensity} onChange={(e) => setDisplayDensity(e.target.value)}>
+          <option value="compact">Compact</option>
+          <option value="comfortable">Comfortable</option>
+        </select>
         <button className="btn" onClick={() => openView("search")}>Search</button>
         <button className="btn primary" onClick={handleCreateMoc} disabled={busy}>New MOC</button>
         <label className="btn">Import CSV<input type="file" accept=".csv,text/csv" style={{ display:"none" }} onChange={(e)=>{ const file = e.target.files?.[0]; if (file) handleImportCsv(file); e.target.value = ""; }} /></label>
@@ -1228,7 +1232,7 @@ export default function App() {
                 </div>
               );
             })}
-            {!visibleMocs.length ? <div className="muted">No MOCs match the filters.</div> : null}
+            {!visibleMocs.length ? <div className="muted">No MOCs match the current filters.</div> : null}
           </div>
         </aside>
       <main className="content">
@@ -1278,9 +1282,9 @@ export default function App() {
               <select value={sortField} onChange={(e)=>setSortField(e.target.value)}><option value="part">Sort: Part</option><option value="color">Sort: Color</option><option value="need">Sort: Need</option><option value="have">Sort: Have</option><option value="missing">Sort: Missing</option><option value="ordered">Sort: Ordered</option><option value="arrived">Sort: Arrived</option><option value="completed">Sort: Completed</option></select>
               <select value={sortDir} onChange={(e)=>setSortDir(e.target.value)}><option value="asc">Asc</option><option value="desc">Desc</option></select>
             </div>
-            <div className="section-block"><h3>Active</h3><PartTable parts={activeParts} onEdit={setEditingPart} onDelete={handleDeletePart} onPatch={patchPart} /></div>
-            <div className="section-block"><h3>Ordered / Arriving</h3><PartTable parts={orderedParts} onEdit={setEditingPart} onDelete={handleDeletePart} onPatch={patchPart} /></div>
-            <div className="section-block"><h3>Completed</h3><PartTable parts={completedParts} onEdit={setEditingPart} onDelete={handleDeletePart} onPatch={patchPart} /></div>
+            <div className="section-block"><h3>Active</h3><div className="muted">Parts still being collected or tracked.</div><PartTable parts={activeParts} onEdit={setEditingPart} onDelete={handleDeletePart} onPatch={patchPart} /></div>
+            <div className="section-block"><h3>Ordered / Arriving</h3><div className="muted">Parts already sourced and still in the arrival workflow.</div><PartTable parts={orderedParts} onEdit={setEditingPart} onDelete={handleDeletePart} onPatch={patchPart} /></div>
+            <div className="section-block"><h3>Completed</h3><div className="muted">Resolved lines, including completed and substituted.</div><PartTable parts={completedParts} onEdit={setEditingPart} onDelete={handleDeletePart} onPatch={patchPart} /></div>
           </div>
         </> : <div className="panel">Create or import a MOC to get started.</div>}
       </main>

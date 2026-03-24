@@ -215,3 +215,11 @@ Next:
 
 - Added a shared openView helper for top-nav and saved views
 - Saved views now use the same screen-switching path as manual navigation
+
+
+## Sprint 5.3
+
+- Visual polish across panels, tables, cards, and badges
+- Improved part image framing and fallback presentation
+- Compact and comfortable density modes
+- Cleaner empty states and section guidance
