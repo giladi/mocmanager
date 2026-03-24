@@ -929,7 +929,7 @@ export default function App() {
     </header>
     {error ? <div className="error-banner">{error}</div> : null}
 
-    {!showBuyList && !showOrders ? <div className="layout">
+    {showGlobalSearch ? <GlobalSearchPanel query={globalSearch} setQuery={setGlobalSearch} results={globalSearchResults} onOpenMoc={openMocFromBuyList} /> : !showBuyList && !showOrders ? <div className="layout">
       <aside className="sidebar panel">
           <div className="sidebar-header"><h2>MOCs</h2></div>
           <div className="filters moc-dashboard-filters">

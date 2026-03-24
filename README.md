@@ -176,3 +176,8 @@ Next:
 ## v22 search hotfix
 
 - Fix Search button routing so it opens the global search view
+
+
+## v23 search render fix
+
+- Fixed top-level render logic so Search view is shown before Dashboard
