@@ -230,3 +230,9 @@ Next:
 - Removed sprint subtitle from the app header
 - Reworked top navigation and actions into grouped header controls
 - Improved overall header layout for a more GA-like presentation
+
+
+## v31 layout alignment
+
+- Align header and saved views panel width with the main content area
+- Fix top-section container width mismatch

@@ -780,3 +780,22 @@ select {
     justify-content: flex-start;
   }
 }
+
+
+/* v31 layout alignment */
+.page > .header,
+.page > .saved-views-panel {
+  width: 100%;
+  max-width: none;
+}
+
+.page > .saved-views-panel,
+.page > .header,
+.page > .layout,
+.page > .content {
+  box-sizing: border-box;
+}
+
+.page > .saved-views-panel {
+  display: block;
+}
