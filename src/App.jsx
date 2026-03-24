@@ -381,6 +381,69 @@ function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, sele
 }
 
 
+
+function GlobalSearchPanel({ query, setQuery, results, onOpenMoc }) {
+  return <div className="content">
+    <div className="panel">
+      <div className="row-between">
+        <h2>Search across all MOCs</h2>
+      </div>
+      <p className="subtitle">Search by part number, color, MOC name, or note.</p>
+      <input
+        className="search global-search-input"
+        placeholder="Search part number, color, note, or MOC name"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+    </div>
+
+    {query.trim() ? (
+      <div className="panel">
+        <div className="row-between">
+          <h3>Results</h3>
+          <div className="muted">{results.length} matches</div>
+        </div>
+        {!results.length ? <div className="muted">No matches found.</div> : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>MOC</th>
+                  <th>Part</th>
+                  <th>Color</th>
+                  <th>Need</th>
+                  <th>Have</th>
+                  <th>Missing</th>
+                  <th>Ordered</th>
+                  <th>Arrived</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((row) => (
+                  <tr key={row.id}>
+                    <td><button className="link-button" onClick={() => onOpenMoc(row.mocId)}>{row.mocName}</button></td>
+                    <td>{row.partNumber}</td>
+                    <td>{row.color}</td>
+                    <td>{row.requiredQty}</td>
+                    <td>{row.haveQty}</td>
+                    <td>{row.missingQty}</td>
+                    <td>{row.ordered ? "Yes" : "No"}</td>
+                    <td>{row.arrived ? "Yes" : "No"}</td>
+                    <td>{row.note ? <span className="part-note-inline">📝 {row.note}</span> : <span className="muted">—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    ) : (
+      <div className="panel"><div className="muted">Start typing to search across all MOCs.</div></div>
+    )}
+  </div>;
+}
+
 function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDetails, metricsByOrderId }) {
   return <div className="panel">
     <div className="row-between"><h2>Orders</h2><button className="btn primary" onClick={() => onOpenOrderEditor({ status:"draft" })}>Create order</button></div>
@@ -417,7 +480,7 @@ function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDet
 
 
 export default function App() {
-  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]), [mocStatusFilter, setMocStatusFilter] = useState("all"), [mocPriorityFilter, setMocPriorityFilter] = useState("all"), [mocSort, setMocSort] = useState("name");
+  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]), [mocStatusFilter, setMocStatusFilter] = useState("all"), [mocPriorityFilter, setMocPriorityFilter] = useState("all"), [mocSort, setMocSort] = useState("name"), [showGlobalSearch, setShowGlobalSearch] = useState(false), [globalSearch, setGlobalSearch] = useState("");
   const selectedMoc = useMemo(() => mocs.find((m) => m.id === selectedMocId) || null, [mocs, selectedMocId]);
   const mocMetricsById = useMemo(() => {
     const map = {};
@@ -457,6 +520,41 @@ export default function App() {
     });
     return list;
   }, [mocs, mocMetricsById, mocStatusFilter, mocPriorityFilter, mocSort]);
+
+  const globalSearchResults = useMemo(() => {
+    const q = globalSearch.trim().toLowerCase();
+    if (!q) return [];
+    return allParts
+      .filter((part) => {
+        const mocName = part.mocs?.name || "";
+        const note = part.note || "";
+        return (
+          (part.part_number || "").toLowerCase().includes(q) ||
+          (part.color || "").toLowerCase().includes(q) ||
+          mocName.toLowerCase().includes(q) ||
+          note.toLowerCase().includes(q)
+        );
+      })
+      .map((part) => ({
+        id: part.id,
+        mocId: part.mocs?.id || "",
+        mocName: part.mocs?.name || "MOC",
+        partNumber: part.part_number,
+        color: part.color,
+        requiredQty: part.required_qty || 0,
+        haveQty: part.have_qty || 0,
+        missingQty: Math.max((part.required_qty || 0) - (part.have_qty || 0), 0),
+        ordered: !!part.ordered,
+        arrived: !!part.arrived,
+        note: part.note || ""
+      }))
+      .sort((a, b) =>
+        a.partNumber.localeCompare(b.partNumber) ||
+        a.color.localeCompare(b.color) ||
+        a.mocName.localeCompare(b.mocName)
+      );
+  }, [allParts, globalSearch]);
+
 
 
   const ordersByPartId = useMemo(() => {
@@ -818,11 +916,12 @@ export default function App() {
 
   return <div className="page">
     <header className="header">
-      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 4.1: per-part notes.</p></div>
+      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 4.2: search across all MOCs.</p></div>
       <div className="toolbar">
-        <button className="btn" onClick={() => { setShowBuyList(false); setShowOrders(false); }}>Dashboard</button>
-        <button className="btn" onClick={() => { setShowBuyList(true); setShowOrders(false); }}>Buy List</button>
-        <button className="btn" onClick={() => { setShowOrders(true); setShowBuyList(false); }}>Orders</button>
+        <button className="btn" onClick={() => { setShowBuyList(false); setShowOrders(false); setShowGlobalSearch(false); }}>Dashboard</button>
+        <button className="btn" onClick={() => { setShowBuyList(true); setShowOrders(false); setShowGlobalSearch(false); }}>Buy List</button>
+        <button className="btn" onClick={() => { setShowOrders(true); setShowBuyList(false); setShowGlobalSearch(false); }}>Orders</button>
+        <button className="btn" onClick={() => { setShowGlobalSearch(true); setShowBuyList(false); setShowOrders(false); }}>Search</button>
         <button className="btn primary" onClick={handleCreateMoc} disabled={busy}>New MOC</button>
         <label className="btn">Import CSV<input type="file" accept=".csv,text/csv" style={{ display:"none" }} onChange={(e)=>{ const file = e.target.files?.[0]; if (file) handleImportCsv(file); e.target.value = ""; }} /></label>
         <button className="btn" onClick={() => signOut()}>Sign out</button>

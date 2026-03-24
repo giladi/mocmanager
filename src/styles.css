@@ -465,3 +465,7 @@ th { background: #fafafa; }
   padding: 4px 8px;
   display: inline-block;
 }
+
+.global-search-input {
+  margin-top: 12px;
+}

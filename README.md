@@ -164,3 +164,10 @@ Next:
 - Per-part notes on MOC lines
 - Inline note editing in parts tables
 - Notes visible in Buy List and Order Details where relevant
+
+
+## Sprint 4.2
+
+- Global search across all MOCs
+- Search by part number, color, MOC name, and notes
+- Search results can jump directly into the matching MOC
