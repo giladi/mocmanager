@@ -223,3 +223,10 @@ Next:
 - Improved part image framing and fallback presentation
 - Compact and comfortable density modes
 - Cleaner empty states and section guidance
+
+
+## v30 header polish
+
+- Removed sprint subtitle from the app header
+- Reworked top navigation and actions into grouped header controls
+- Improved overall header layout for a more GA-like presentation

@@ -1141,20 +1141,29 @@ export default function App() {
   if (!session?.user) return <AuthScreen onAuthed={async ()=>setSession(await getSession())} />;
 
   return <div className={`page density-${displayDensity}`}>
-    <header className="header">
-      <div><h1>LEGO MOC Manager</h1><p className="subtitle">Sprint 5.3: image and visual improvements.</p></div>
-      <div className="toolbar">
-        <button className="btn" onClick={() => openView("dashboard")}>Dashboard</button>
-        <button className="btn" onClick={() => openView("buylist")}>Buy List</button>
-        <button className="btn" onClick={() => openView("orders")}>Orders</button>
-        <select value={displayDensity} onChange={(e) => setDisplayDensity(e.target.value)}>
-          <option value="compact">Compact</option>
-          <option value="comfortable">Comfortable</option>
-        </select>
-        <button className="btn" onClick={() => openView("search")}>Search</button>
-        <button className="btn primary" onClick={handleCreateMoc} disabled={busy}>New MOC</button>
-        <label className="btn">Import CSV<input type="file" accept=".csv,text/csv" style={{ display:"none" }} onChange={(e)=>{ const file = e.target.files?.[0]; if (file) handleImportCsv(file); e.target.value = ""; }} /></label>
-        <button className="btn" onClick={() => signOut()}>Sign out</button>
+    
+    <header className="header app-header">
+      <div className="brand-block">
+        <h1>LEGO MOC Manager</h1>
+      </div>
+      <div className="header-controls">
+        <div className="header-group nav-group">
+          <button className="btn nav-btn" onClick={() => openView("dashboard")}>Dashboard</button>
+          <button className="btn nav-btn" onClick={() => openView("buylist")}>Buy List</button>
+          <button className="btn nav-btn" onClick={() => openView("orders")}>Orders</button>
+          <button className="btn nav-btn" onClick={() => openView("search")}>Search</button>
+        </div>
+        <div className="header-group utility-group">
+          <select value={displayDensity} onChange={(e) => setDisplayDensity(e.target.value)} className="density-select">
+            <option value="compact">Compact</option>
+            <option value="comfortable">Comfortable</option>
+          </select>
+        </div>
+        <div className="header-group action-group">
+          <button className="btn primary" onClick={handleCreateMoc} disabled={busy}>New MOC</button>
+          <label className="btn">Import CSV<input type="file" accept=".csv,text/csv" style={{ display:"none" }} onChange={(e)=>{ const file = e.target.files?.[0]; if (file) handleImportCsv(file); e.target.value = ""; }} /></label>
+          <button className="btn" onClick={() => signOut()}>Sign out</button>
+        </div>
       </div>
     </header>
     {error ? <div className="error-banner">{error}</div> : null}
