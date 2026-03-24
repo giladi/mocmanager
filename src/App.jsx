@@ -433,6 +433,105 @@ function BuyListSection({ title, subtitle, rows, mode, mocFilterId, orders, sele
 
 
 
+
+function GuidePanel() {
+  return <div className="content">
+    <div className="panel">
+      <h2>How to use LEGO MOC Manager</h2>
+      <p className="subtitle">This page explains the main workflow and what each page is for.</p>
+    </div>
+
+    <div className="panel">
+      <h3>Main workflow</h3>
+      <div className="guide-grid">
+        <div className="guide-card">
+          <strong>1. Create or import a MOC</strong>
+          <p>Add a MOC manually or import a Rebrickable CSV. The app groups parts and builds the working list for that project.</p>
+        </div>
+        <div className="guide-card">
+          <strong>2. Track what you have</strong>
+          <p>For each part, enter how much you already have. The remaining quantity becomes the missing amount used by the planning and buy-list flows.</p>
+        </div>
+        <div className="guide-card">
+          <strong>3. Use the Buy List</strong>
+          <p>The Buy List groups missing parts across MOCs. Move items from To Order into Ordered, then track arrivals and assignments into real orders.</p>
+        </div>
+        <div className="guide-card">
+          <strong>4. Manage Orders</strong>
+          <p>Create orders, assign lines to them, and track ordered quantity, arrived quantity, vendor SKU, line status, and sourcing notes.</p>
+        </div>
+      </div>
+    </div>
+
+    <div className="panel">
+      <h3>Pages</h3>
+      <div className="guide-sections">
+        <div className="guide-section">
+          <strong>Dashboard</strong>
+          <p>Home page for planning. Shows MOCs, status, priority, progress, and summary metrics. Use it to decide what to work on next.</p>
+        </div>
+        <div className="guide-section">
+          <strong>Buy List</strong>
+          <p>Operational page for missing parts. Use it to see To Order and Ordered parts, bulk-assign order lines, and track arrival progress.</p>
+        </div>
+        <div className="guide-section">
+          <strong>Orders</strong>
+          <p>Order management page. Create orders, view summaries, inspect assigned lines, and update sourcing and arrival details.</p>
+        </div>
+        <div className="guide-section">
+          <strong>Search</strong>
+          <p>Search across all MOCs by part number, color, MOC name, or note. Use it to find where a part appears and jump into that MOC.</p>
+        </div>
+        <div className="guide-section">
+          <strong>Guide</strong>
+          <p>This help page. Good for onboarding and for quickly reminding yourself how the system is structured.</p>
+        </div>
+      </div>
+    </div>
+
+    <div className="panel">
+      <h3>Key concepts</h3>
+      <div className="guide-sections">
+        <div className="guide-section">
+          <strong>Have / Missing</strong>
+          <p><em>Have</em> is what you already own. <em>Missing</em> is required minus have.</p>
+        </div>
+        <div className="guide-section">
+          <strong>To Order / Ordered</strong>
+          <p>To Order means a part is still missing and not yet sourced. Ordered means you already decided it belongs to a sourcing flow.</p>
+        </div>
+        <div className="guide-section">
+          <strong>Arrived</strong>
+          <p>At the order-line level, arrived tracks what has physically come in. The sourcing flow also supports partial arrival states.</p>
+        </div>
+        <div className="guide-section">
+          <strong>Substitute logic</strong>
+          <p>Exact means you need the exact part. Substitute allowed means a replacement is acceptable. Substituted means the requirement is already solved another way.</p>
+        </div>
+      </div>
+    </div>
+
+    <div className="panel">
+      <h3>Useful features</h3>
+      <div className="guide-sections">
+        <div className="guide-section">
+          <strong>Saved views</strong>
+          <p>Save common filters and view setups so you can reopen them later in one click.</p>
+        </div>
+        <div className="guide-section">
+          <strong>CSV export</strong>
+          <p>Export the selected MOC, grouped Buy List views, or an order to CSV for external work or backup.</p>
+        </div>
+        <div className="guide-section">
+          <strong>Notes</strong>
+          <p>Use part notes for drawer locations, reminders, internal substitution details, or build-specific guidance.</p>
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+
+
 function SavedViewsPanel({ savedViews, onApply, onDelete, onSaveCurrent }) {
   return (
     <div className="panel saved-views-panel">
@@ -560,7 +659,7 @@ function OrdersPanel({ orders, groupedBuyRows, onOpenOrderEditor, onOpenOrderDet
 
 
 export default function App() {
-  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]), [mocStatusFilter, setMocStatusFilter] = useState("all"), [mocPriorityFilter, setMocPriorityFilter] = useState("all"), [mocSort, setMocSort] = useState("name"), [showGlobalSearch, setShowGlobalSearch] = useState(false), [globalSearch, setGlobalSearch] = useState(""), [savedViews, setSavedViews] = useState([]), [displayDensity, setDisplayDensity] = useState("comfortable");
+  const [session, setSession] = useState(null), [loadingSession, setLoadingSession] = useState(true), [mocs, setMocs] = useState([]), [selectedMocId, setSelectedMocId] = useState(null), [parts, setParts] = useState([]), [allParts, setAllParts] = useState([]), [orders, setOrders] = useState([]), [partSearch, setPartSearch] = useState(""), [colorFilter, setColorFilter] = useState("All"), [sortField, setSortField] = useState("part"), [sortDir, setSortDir] = useState("asc"), [showBuyList, setShowBuyList] = useState(false), [showOrders, setShowOrders] = useState(false), [buyListMocFilter, setBuyListMocFilter] = useState("all"), [editingPart, setEditingPart] = useState(null), [editingMoc, setEditingMoc] = useState(false), [editingOrder, setEditingOrder] = useState(null), [viewingOrder, setViewingOrder] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [csvPreview, setCsvPreview] = useState(null), [selectedOrderedIds, setSelectedOrderedIds] = useState([]), [selectedOrderId, setSelectedOrderId] = useState(""), [selectedOrderDetailIds, setSelectedOrderDetailIds] = useState([]), [mocStatusFilter, setMocStatusFilter] = useState("all"), [mocPriorityFilter, setMocPriorityFilter] = useState("all"), [mocSort, setMocSort] = useState("name"), [showGlobalSearch, setShowGlobalSearch] = useState(false), [showGuide, setShowGuide] = useState(false), [globalSearch, setGlobalSearch] = useState(""), [savedViews, setSavedViews] = useState([]), [displayDensity, setDisplayDensity] = useState("comfortable");
   const selectedMoc = useMemo(() => mocs.find((m) => m.id === selectedMocId) || null, [mocs, selectedMocId]);
   const mocMetricsById = useMemo(() => {
     const map = {};
@@ -687,6 +786,7 @@ export default function App() {
   async function refreshSavedViews() { try { setSavedViews(await listSavedViews()); } catch (err) { setError(err.message || "Could not load saved views."); } }
 
   function openView(viewType) {
+    setShowGuide(viewType === "guide");
     setShowGlobalSearch(viewType === "search");
     setShowBuyList(viewType === "buylist");
     setShowOrders(viewType === "orders");
@@ -982,6 +1082,7 @@ export default function App() {
 
 
   function getCurrentViewType() {
+    if (showGuide) return "guide";
     if (showGlobalSearch) return "search";
     if (showBuyList) return "buylist";
     if (showOrders) return "orders";
@@ -1152,6 +1253,7 @@ export default function App() {
           <button className="btn nav-btn" onClick={() => openView("buylist")}>Buy List</button>
           <button className="btn nav-btn" onClick={() => openView("orders")}>Orders</button>
           <button className="btn nav-btn" onClick={() => openView("search")}>Search</button>
+          <button className="btn nav-btn" onClick={() => openView("guide")}>Guide</button>
         </div>
         <div className="header-group utility-group">
           <select value={displayDensity} onChange={(e) => setDisplayDensity(e.target.value)} className="density-select">
@@ -1170,7 +1272,7 @@ export default function App() {
 
     <SavedViewsPanel savedViews={savedViews} onApply={applySavedView} onDelete={handleDeleteSavedView} onSaveCurrent={handleSaveCurrentView} />
 
-    {showGlobalSearch ? <GlobalSearchPanel query={globalSearch} setQuery={setGlobalSearch} results={globalSearchResults} onOpenMoc={openMocFromBuyList} /> : !showBuyList && !showOrders ? <div className="layout">
+    {showGuide ? <GuidePanel /> : showGlobalSearch ? <GlobalSearchPanel query={globalSearch} setQuery={setGlobalSearch} results={globalSearchResults} onOpenMoc={openMocFromBuyList} /> : !showBuyList && !showOrders ? <div className="layout">
       <aside className="sidebar panel">
           <div className="sidebar-header"><h2>MOCs</h2></div>
           <div className="filters moc-dashboard-filters">

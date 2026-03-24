@@ -851,3 +851,21 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.guide-card,
+.guide-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff;
+}
+.guide-sections {
+  display: grid;
+  gap: 12px;
+}

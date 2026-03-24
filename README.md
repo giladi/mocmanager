@@ -242,3 +242,10 @@ Next:
 
 - Constrained the dashboard grid to prevent the lower content area from stretching wider than the header
 - Main content column now uses minmax(0, 1fr) to avoid overflow
+
+
+## v33 guide page
+
+- Added a dedicated Guide page
+- Explains the main workflow, pages, and core concepts
+- Added Guide button to the top navigation
