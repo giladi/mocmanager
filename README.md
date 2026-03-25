@@ -258,3 +258,10 @@ Next:
   - 297 -> Pearl Gold
   - 80 -> Metallic Silver
   - 82 -> Metallic Gold
+
+
+## v35 Rebrickable image fallback
+
+- Added Rebrickable API fallback for missing part images
+- Uses environment variable `VITE_REBRICKABLE_API_KEY`
+- BrickLink remains the first image source; Rebrickable is used when BrickLink images fail

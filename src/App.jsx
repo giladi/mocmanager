@@ -8,6 +8,20 @@ import { supabase } from "./lib/supabase";
 
 const REBRICKABLE_COLOR_MAP = {"0":"Black","1":"Blue","2":"Tan","4":"Orange","14":"Yellow","15":"White","19":"Trans Green","25":"Orange","34":"Lime","36":"Bright Green","40":"Trans Clear","41":"Trans Red","47":"Trans Yellow","71":"Light Bluish Gray","72":"Dark Bluish Gray","73":"Medium Blue","80":"Metallic Silver","82":"Metallic Gold","179":"Flat Silver","182":"Trans Orange","272":"Dark Blue","297":"Pearl Gold","484":"Dark Orange","9999":"Any Color"};
 const BRICKLINK_COLOR_CODES = {"White":1,"Yellow":3,"Red":5,"Blue":7,"Black":11,"Tan":2,"Orange":4,"Lime":34,"Bright Green":36,"Trans Clear":12,"Trans Red":41,"Trans Yellow":46,"Trans Green":20,"Light Bluish Gray":86,"Dark Bluish Gray":85,"Medium Blue":42,"Dark Blue":63,"Dark Orange":68,"Flat Silver":95};
+const REBRICKABLE_API_KEY = import.meta.env.VITE_REBRICKABLE_API_KEY || "";
+const REBRICKABLE_COLOR_NAME_TO_ID = Object.fromEntries(
+  Object.entries(REBRICKABLE_COLOR_MAP).map(([id, name]) => [name, id])
+);
+const REBRICKABLE_COLOR_ALIASES = {
+  "Flat Silver": "179",
+  "Light Bluish Gray": "71",
+  "Dark Bluish Gray": "72",
+  "Medium Blue": "73",
+  "Pearl Gold": "297",
+  "Metallic Silver": "80",
+  "Metallic Gold": "82",
+  "Any Color": "9999"
+};
 
 const brickLinkSearchUrl = (partNumber) => `https://www.bricklink.com/v2/search.page?q=${encodeURIComponent(partNumber)}#T=P`;
 const brickOwlSearchUrl = (partNumber, color) => `https://www.brickowl.com/search/catalog?query=${encodeURIComponent(`${partNumber} ${color}`)}`;
@@ -51,14 +65,122 @@ function imageCandidates(partNumber, color) {
     `https://img.bricklink.com/ItemImage/PL/${code}/${partNumber}.jpg`,
   ];
 }
+
 function PartImage({ partNumber, color }) {
   const candidates = useMemo(() => imageCandidates(partNumber, color), [partNumber, color]);
   const [index, setIndex] = useState(0);
+  const [fallbackUrl, setFallbackUrl] = useState("");
   const [failed, setFailed] = useState(candidates.length === 0);
-  useEffect(() => { setIndex(0); setFailed(candidates.length === 0); }, [partNumber, color, candidates.length]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRebrickableFallback() {
+      if (!REBRICKABLE_API_KEY) {
+        if (!cancelled) setFailed(true);
+        return;
+      }
+
+      const colorId =
+        REBRICKABLE_COLOR_NAME_TO_ID[color] ||
+        REBRICKABLE_COLOR_ALIASES[color] ||
+        "";
+
+      const headers = { Authorization: `key ${REBRICKABLE_API_KEY}` };
+      const urls = [];
+      if (colorId && colorId !== "9999") {
+        urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/colors/${encodeURIComponent(colorId)}/`);
+      }
+      urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/`);
+
+      for (const url of urls) {
+        try {
+          const response = await fetch(url, { headers });
+          if (!response.ok) continue;
+          const data = await response.json();
+          const img = data?.part_img_url || data?.part?.part_img_url || "";
+          if (img) {
+            if (!cancelled) {
+              setFallbackUrl(img);
+              setFailed(false);
+            }
+            return;
+          }
+        } catch (_err) {
+          // ignore and continue to next fallback
+        }
+      }
+
+      if (!cancelled) setFailed(true);
+    }
+
+    setIndex(0);
+    setFallbackUrl("");
+    setFailed(candidates.length === 0);
+
+    if (candidates.length === 0) {
+      loadRebrickableFallback();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [partNumber, color, candidates.length]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFallbackAfterBricklinkFailure() {
+      if (!failed || fallbackUrl || !REBRICKABLE_API_KEY) return;
+
+      const colorId =
+        REBRICKABLE_COLOR_NAME_TO_ID[color] ||
+        REBRICKABLE_COLOR_ALIASES[color] ||
+        "";
+
+      const headers = { Authorization: `key ${REBRICKABLE_API_KEY}` };
+      const urls = [];
+      if (colorId && colorId !== "9999") {
+        urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/colors/${encodeURIComponent(colorId)}/`);
+      }
+      urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/`);
+
+      for (const url of urls) {
+        try {
+          const response = await fetch(url, { headers });
+          if (!response.ok) continue;
+          const data = await response.json();
+          const img = data?.part_img_url || data?.part?.part_img_url || "";
+          if (img) {
+            if (!cancelled) {
+              setFallbackUrl(img);
+              setFailed(false);
+            }
+            return;
+          }
+        } catch (_err) {
+          // ignore and continue
+        }
+      }
+    }
+
+    loadFallbackAfterBricklinkFailure();
+    return () => {
+      cancelled = true;
+    };
+  }, [failed, fallbackUrl, partNumber, color]);
+
+  if (fallbackUrl) {
+    return <div className="part-image-frame"><img className="part-image" src={fallbackUrl} alt={`${partNumber} ${color}`} /></div>;
+  }
+
   if (failed) return <div className="part-image-frame"><div className="part-image-fallback"><div>No image</div></div></div>;
+
   return <div className="part-image-frame"><img className="part-image" src={candidates[index]} alt={`${partNumber} ${color}`} onError={() => {
-    if (index < candidates.length - 1) setIndex(i => i + 1); else setFailed(true);
+    if (index < candidates.length - 1) {
+      setIndex(i => i + 1);
+    } else {
+      setFailed(true);
+    }
   }} /></div>;
 }
 
@@ -521,6 +643,10 @@ function GuidePanel() {
         <div className="guide-section">
           <strong>CSV export</strong>
           <p>Export the selected MOC, grouped Buy List views, or an order to CSV for external work or backup.</p>
+        </div>
+        <div className="guide-section">
+          <strong>Images</strong>
+          <p>Part images try BrickLink first and can fall back to Rebrickable when a Rebrickable API key is configured in the app environment.</p>
         </div>
         <div className="guide-section">
           <strong>Notes</strong>
