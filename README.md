@@ -265,3 +265,8 @@ Next:
 - Added Rebrickable API fallback for missing part images
 - Uses environment variable `VITE_REBRICKABLE_API_KEY`
 - BrickLink remains the first image source; Rebrickable is used when BrickLink images fail
+
+
+## v36 default sort color
+
+- Default part-table sorting changed from part number to color
