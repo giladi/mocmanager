@@ -278,3 +278,11 @@ Next:
 - Added miss-cache to avoid repeated failed lookups
 - Added loading state while fallback image is being fetched
 - Improves reliability of missing-image fallback without repeated refreshes
+
+
+## v38 Rebrickable proxy
+
+- Replaced direct browser calls to Rebrickable with a Cloudflare Pages Function proxy at `/api/rebrickable-image`
+- Uses Cloudflare environment variable `REBRICKABLE_API_KEY`
+- Fixes CORS issues and avoids exposing the API key in frontend code
+- Guide page updated to reflect the new image fallback architecture

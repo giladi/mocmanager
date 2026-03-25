@@ -8,7 +8,7 @@ import { supabase } from "./lib/supabase";
 
 const REBRICKABLE_COLOR_MAP = {"0":"Black","1":"Blue","2":"Tan","4":"Orange","14":"Yellow","15":"White","19":"Trans Green","25":"Orange","34":"Lime","36":"Bright Green","40":"Trans Clear","41":"Trans Red","47":"Trans Yellow","71":"Light Bluish Gray","72":"Dark Bluish Gray","73":"Medium Blue","80":"Metallic Silver","82":"Metallic Gold","179":"Flat Silver","182":"Trans Orange","272":"Dark Blue","297":"Pearl Gold","484":"Dark Orange","9999":"Any Color"};
 const BRICKLINK_COLOR_CODES = {"White":1,"Yellow":3,"Red":5,"Blue":7,"Black":11,"Tan":2,"Orange":4,"Lime":34,"Bright Green":36,"Trans Clear":12,"Trans Red":41,"Trans Yellow":46,"Trans Green":20,"Light Bluish Gray":86,"Dark Bluish Gray":85,"Medium Blue":42,"Dark Blue":63,"Dark Orange":68,"Flat Silver":95};
-const REBRICKABLE_API_KEY = import.meta.env.VITE_REBRICKABLE_API_KEY || "";
+const REBRICKABLE_API_KEY = ""; // replaced by Cloudflare proxy in v38
 const REBRICKABLE_COLOR_NAME_TO_ID = Object.fromEntries(
   Object.entries(REBRICKABLE_COLOR_MAP).map(([id, name]) => [name, id])
 );
@@ -58,6 +58,14 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
+async function fetchRebrickableFallbackFromProxy(partNumber, color) {
+  const params = new URLSearchParams({ part: partNumber, color });
+  const response = await fetch(`/api/rebrickable-image?${params.toString()}`);
+  if (!response.ok) return "";
+  const data = await response.json();
+  return data?.imageUrl || "";
+}
+
 function imageCandidates(partNumber, color) {
   const code = BRICKLINK_COLOR_CODES[color];
   if (!code) return [];
@@ -68,6 +76,7 @@ function imageCandidates(partNumber, color) {
     `https://img.bricklink.com/ItemImage/PL/${code}/${partNumber}.jpg`,
   ];
 }
+
 
 
 function PartImage({ partNumber, color }) {
@@ -86,46 +95,29 @@ function PartImage({ partNumber, color }) {
     setFailed(candidates.length === 0 && !cached);
   }, [cacheKey, candidates.length]);
 
-  async function fetchRebrickableFallback() {
+  async function fetchProxyFallback() {
     if (IMAGE_FALLBACK_CACHE.has(cacheKey)) {
       setFallbackUrl(IMAGE_FALLBACK_CACHE.get(cacheKey) || "");
       setFailed(false);
       return;
     }
-    if (IMAGE_FALLBACK_MISS_CACHE.has(cacheKey) || !REBRICKABLE_API_KEY) {
+    if (IMAGE_FALLBACK_MISS_CACHE.has(cacheKey)) {
       setFailed(true);
       return;
     }
 
     setLoadingFallback(true);
-    const colorId =
-      REBRICKABLE_COLOR_NAME_TO_ID[color] ||
-      REBRICKABLE_COLOR_ALIASES[color] ||
-      "";
-
-    const headers = { Authorization: `key ${REBRICKABLE_API_KEY}` };
-    const urls = [];
-    if (colorId && colorId !== "9999") {
-      urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/colors/${encodeURIComponent(colorId)}/`);
-    }
-    urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/`);
-
-    for (const url of urls) {
-      try {
-        const response = await fetch(url, { headers });
-        if (!response.ok) continue;
-        const data = await response.json();
-        const img = data?.part_img_url || data?.part?.part_img_url || "";
-        if (img) {
-          IMAGE_FALLBACK_CACHE.set(cacheKey, img);
-          setFallbackUrl(img);
-          setLoadingFallback(false);
-          setFailed(false);
-          return;
-        }
-      } catch (_err) {
-        // continue to next candidate
+    try {
+      const img = await fetchRebrickableFallbackFromProxy(partNumber, color);
+      if (img) {
+        IMAGE_FALLBACK_CACHE.set(cacheKey, img);
+        setFallbackUrl(img);
+        setLoadingFallback(false);
+        setFailed(false);
+        return;
       }
+    } catch (_err) {
+      // ignore
     }
 
     IMAGE_FALLBACK_MISS_CACHE.add(cacheKey);
@@ -135,7 +127,7 @@ function PartImage({ partNumber, color }) {
 
   useEffect(() => {
     if (!fallbackUrl && candidates.length === 0) {
-      fetchRebrickableFallback();
+      fetchProxyFallback();
     }
   }, [cacheKey, fallbackUrl, candidates.length]);
 
@@ -155,7 +147,7 @@ function PartImage({ partNumber, color }) {
     if (index < candidates.length - 1) {
       setIndex(i => i + 1);
     } else {
-      fetchRebrickableFallback();
+      fetchProxyFallback();
     }
   }} /></div>;
 }
@@ -622,7 +614,7 @@ function GuidePanel() {
         </div>
         <div className="guide-section">
           <strong>Images</strong>
-          <p>Part images try BrickLink first and can fall back to Rebrickable when a Rebrickable API key is configured in the app environment. Fallback lookups are cached to improve reliability for repeated views.</p>
+          <p>Part images try BrickLink first and can fall back through the app’s own Cloudflare proxy to Rebrickable when `REBRICKABLE_API_KEY` is configured in Cloudflare. Fallback lookups are cached to improve reliability for repeated views.</p>
         </div>
         <div className="guide-section">
           <strong>Notes</strong>
