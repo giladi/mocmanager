@@ -270,3 +270,11 @@ Next:
 ## v36 default sort color
 
 - Default part-table sorting changed from part number to color
+
+
+## v37 image cache
+
+- Added in-memory caching for resolved Rebrickable fallback image URLs
+- Added miss-cache to avoid repeated failed lookups
+- Added loading state while fallback image is being fetched
+- Improves reliability of missing-image fallback without repeated refreshes

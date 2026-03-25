@@ -23,6 +23,9 @@ const REBRICKABLE_COLOR_ALIASES = {
   "Any Color": "9999"
 };
 
+const IMAGE_FALLBACK_CACHE = new Map();
+const IMAGE_FALLBACK_MISS_CACHE = new Set();
+
 const brickLinkSearchUrl = (partNumber) => `https://www.bricklink.com/v2/search.page?q=${encodeURIComponent(partNumber)}#T=P`;
 const brickOwlSearchUrl = (partNumber, color) => `https://www.brickowl.com/search/catalog?query=${encodeURIComponent(`${partNumber} ${color}`)}`;
 const rebrickableSearchUrl = (partNumber) => `https://rebrickable.com/parts/?q=${encodeURIComponent(partNumber)}`;
@@ -66,120 +69,93 @@ function imageCandidates(partNumber, color) {
   ];
 }
 
+
 function PartImage({ partNumber, color }) {
   const candidates = useMemo(() => imageCandidates(partNumber, color), [partNumber, color]);
+  const cacheKey = `${partNumber}__${color}`;
   const [index, setIndex] = useState(0);
-  const [fallbackUrl, setFallbackUrl] = useState("");
-  const [failed, setFailed] = useState(candidates.length === 0);
+  const [fallbackUrl, setFallbackUrl] = useState(() => IMAGE_FALLBACK_CACHE.get(cacheKey) || "");
+  const [loadingFallback, setLoadingFallback] = useState(false);
+  const [failed, setFailed] = useState(candidates.length === 0 && !IMAGE_FALLBACK_CACHE.has(cacheKey));
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadRebrickableFallback() {
-      if (!REBRICKABLE_API_KEY) {
-        if (!cancelled) setFailed(true);
-        return;
-      }
-
-      const colorId =
-        REBRICKABLE_COLOR_NAME_TO_ID[color] ||
-        REBRICKABLE_COLOR_ALIASES[color] ||
-        "";
-
-      const headers = { Authorization: `key ${REBRICKABLE_API_KEY}` };
-      const urls = [];
-      if (colorId && colorId !== "9999") {
-        urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/colors/${encodeURIComponent(colorId)}/`);
-      }
-      urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/`);
-
-      for (const url of urls) {
-        try {
-          const response = await fetch(url, { headers });
-          if (!response.ok) continue;
-          const data = await response.json();
-          const img = data?.part_img_url || data?.part?.part_img_url || "";
-          if (img) {
-            if (!cancelled) {
-              setFallbackUrl(img);
-              setFailed(false);
-            }
-            return;
-          }
-        } catch (_err) {
-          // ignore and continue to next fallback
-        }
-      }
-
-      if (!cancelled) setFailed(true);
-    }
-
     setIndex(0);
-    setFallbackUrl("");
-    setFailed(candidates.length === 0);
+    const cached = IMAGE_FALLBACK_CACHE.get(cacheKey) || "";
+    setFallbackUrl(cached);
+    setLoadingFallback(false);
+    setFailed(candidates.length === 0 && !cached);
+  }, [cacheKey, candidates.length]);
 
-    if (candidates.length === 0) {
-      loadRebrickableFallback();
+  async function fetchRebrickableFallback() {
+    if (IMAGE_FALLBACK_CACHE.has(cacheKey)) {
+      setFallbackUrl(IMAGE_FALLBACK_CACHE.get(cacheKey) || "");
+      setFailed(false);
+      return;
+    }
+    if (IMAGE_FALLBACK_MISS_CACHE.has(cacheKey) || !REBRICKABLE_API_KEY) {
+      setFailed(true);
+      return;
     }
 
-    return () => {
-      cancelled = true;
-    };
-  }, [partNumber, color, candidates.length]);
+    setLoadingFallback(true);
+    const colorId =
+      REBRICKABLE_COLOR_NAME_TO_ID[color] ||
+      REBRICKABLE_COLOR_ALIASES[color] ||
+      "";
+
+    const headers = { Authorization: `key ${REBRICKABLE_API_KEY}` };
+    const urls = [];
+    if (colorId && colorId !== "9999") {
+      urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/colors/${encodeURIComponent(colorId)}/`);
+    }
+    urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/`);
+
+    for (const url of urls) {
+      try {
+        const response = await fetch(url, { headers });
+        if (!response.ok) continue;
+        const data = await response.json();
+        const img = data?.part_img_url || data?.part?.part_img_url || "";
+        if (img) {
+          IMAGE_FALLBACK_CACHE.set(cacheKey, img);
+          setFallbackUrl(img);
+          setLoadingFallback(false);
+          setFailed(false);
+          return;
+        }
+      } catch (_err) {
+        // continue to next candidate
+      }
+    }
+
+    IMAGE_FALLBACK_MISS_CACHE.add(cacheKey);
+    setLoadingFallback(false);
+    setFailed(true);
+  }
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadFallbackAfterBricklinkFailure() {
-      if (!failed || fallbackUrl || !REBRICKABLE_API_KEY) return;
-
-      const colorId =
-        REBRICKABLE_COLOR_NAME_TO_ID[color] ||
-        REBRICKABLE_COLOR_ALIASES[color] ||
-        "";
-
-      const headers = { Authorization: `key ${REBRICKABLE_API_KEY}` };
-      const urls = [];
-      if (colorId && colorId !== "9999") {
-        urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/colors/${encodeURIComponent(colorId)}/`);
-      }
-      urls.push(`https://rebrickable.com/api/v3/lego/parts/${encodeURIComponent(partNumber)}/`);
-
-      for (const url of urls) {
-        try {
-          const response = await fetch(url, { headers });
-          if (!response.ok) continue;
-          const data = await response.json();
-          const img = data?.part_img_url || data?.part?.part_img_url || "";
-          if (img) {
-            if (!cancelled) {
-              setFallbackUrl(img);
-              setFailed(false);
-            }
-            return;
-          }
-        } catch (_err) {
-          // ignore and continue
-        }
-      }
+    if (!fallbackUrl && candidates.length === 0) {
+      fetchRebrickableFallback();
     }
-
-    loadFallbackAfterBricklinkFailure();
-    return () => {
-      cancelled = true;
-    };
-  }, [failed, fallbackUrl, partNumber, color]);
+  }, [cacheKey, fallbackUrl, candidates.length]);
 
   if (fallbackUrl) {
     return <div className="part-image-frame"><img className="part-image" src={fallbackUrl} alt={`${partNumber} ${color}`} /></div>;
   }
 
-  if (failed) return <div className="part-image-frame"><div className="part-image-fallback"><div>No image</div></div></div>;
+  if (loadingFallback) {
+    return <div className="part-image-frame"><div className="part-image-fallback"><div>Loading image…</div></div></div>;
+  }
+
+  if (failed) {
+    return <div className="part-image-frame"><div className="part-image-fallback"><div>No image</div></div></div>;
+  }
 
   return <div className="part-image-frame"><img className="part-image" src={candidates[index]} alt={`${partNumber} ${color}`} onError={() => {
     if (index < candidates.length - 1) {
       setIndex(i => i + 1);
     } else {
-      setFailed(true);
+      fetchRebrickableFallback();
     }
   }} /></div>;
 }
@@ -646,7 +622,7 @@ function GuidePanel() {
         </div>
         <div className="guide-section">
           <strong>Images</strong>
-          <p>Part images try BrickLink first and can fall back to Rebrickable when a Rebrickable API key is configured in the app environment.</p>
+          <p>Part images try BrickLink first and can fall back to Rebrickable when a Rebrickable API key is configured in the app environment. Fallback lookups are cached to improve reliability for repeated views.</p>
         </div>
         <div className="guide-section">
           <strong>Notes</strong>
