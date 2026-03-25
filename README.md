@@ -249,3 +249,12 @@ Next:
 - Added a dedicated Guide page
 - Explains the main workflow, pages, and core concepts
 - Added Guide button to the top navigation
+
+
+## v34 color mapping update
+
+- Rebrickable import mapping updated:
+  - 9999 -> Any Color
+  - 297 -> Pearl Gold
+  - 80 -> Metallic Silver
+  - 82 -> Metallic Gold

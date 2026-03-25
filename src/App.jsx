@@ -6,7 +6,7 @@ import {
 } from "./lib/api";
 import { supabase } from "./lib/supabase";
 
-const REBRICKABLE_COLOR_MAP = {"0":"Black","1":"Blue","2":"Tan","4":"Orange","14":"Yellow","15":"White","19":"Trans Green","25":"Orange","34":"Lime","36":"Bright Green","40":"Trans Clear","41":"Trans Red","47":"Trans Yellow","71":"Light Bluish Gray","72":"Dark Bluish Gray","73":"Medium Blue","179":"Flat Silver","182":"Trans Orange","272":"Dark Blue","484":"Dark Orange","9999":"Unknown"};
+const REBRICKABLE_COLOR_MAP = {"0":"Black","1":"Blue","2":"Tan","4":"Orange","14":"Yellow","15":"White","19":"Trans Green","25":"Orange","34":"Lime","36":"Bright Green","40":"Trans Clear","41":"Trans Red","47":"Trans Yellow","71":"Light Bluish Gray","72":"Dark Bluish Gray","73":"Medium Blue","80":"Metallic Silver","82":"Metallic Gold","179":"Flat Silver","182":"Trans Orange","272":"Dark Blue","297":"Pearl Gold","484":"Dark Orange","9999":"Any Color"};
 const BRICKLINK_COLOR_CODES = {"White":1,"Yellow":3,"Red":5,"Blue":7,"Black":11,"Tan":2,"Orange":4,"Lime":34,"Bright Green":36,"Trans Clear":12,"Trans Red":41,"Trans Yellow":46,"Trans Green":20,"Light Bluish Gray":86,"Dark Bluish Gray":85,"Medium Blue":42,"Dark Blue":63,"Dark Orange":68,"Flat Silver":95};
 
 const brickLinkSearchUrl = (partNumber) => `https://www.bricklink.com/v2/search.page?q=${encodeURIComponent(partNumber)}#T=P`;
@@ -110,7 +110,7 @@ function importRebrickableCSV(fileName, text) {
     const spareValue = idxSpare !== -1 ? String(r[idxSpare] || "").trim().toLowerCase() : "";
     const isSpare = ["true","1","yes"].includes(spareValue);
     if (!csvModelName && idxModel !== -1) csvModelName = (r[idxModel] || "").trim();
-    if (!rawColor || color.startsWith("Color ")) unknownColors += 1;
+    if (!rawColor || (color.startsWith("Color ") && rawColor !== "9999" && rawColor !== "297" && rawColor !== "80" && rawColor !== "82")) unknownColors += 1;
     if (isSpare) { spareCount += 1; continue; }
     if (!partNumber || requiredQty <= 0) continue;
     const key = `${partNumber}__${color}`;
