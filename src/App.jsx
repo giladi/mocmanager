@@ -63,9 +63,15 @@ function downloadCsv(filename, rows) {
 async function fetchRebrickableFallbackFromProxy(partNumber, color) {
   const params = new URLSearchParams({ part: partNumber, color });
   const response = await fetch(`/api/rebrickable-image?${params.toString()}`);
-  if (!response.ok) return "";
+  if (!response.ok) return null;
   const data = await response.json();
-  return data?.imageUrl || "";
+  if (!data?.imageUrl) return null;
+  return {
+    url: data.imageUrl,
+    isReference: !!data.isReference,
+    resolvedColor: data.resolvedColor || color,
+    sourceStep: data.sourceStep || "proxy",
+  };
 }
 
 function imageCandidates(partNumber, color) {
@@ -92,6 +98,20 @@ function getImageSourcePlan(color) {
   ];
 }
 
+function getReferenceBadgeLabel(resolvedImage) {
+  if (!resolvedImage?.isReference) return "";
+  if (resolvedImage.sourceStep === "generic_part") return "Part ref";
+  return `${resolvedImage.resolvedColor || REFERENCE_IMAGE_COLOR} ref`;
+}
+
+function getReferenceBadgeTitle(resolvedImage, requestedColor) {
+  if (!resolvedImage?.isReference) return "";
+  if (resolvedImage.sourceStep === "generic_part") {
+    return `Reference image shown because an exact ${requestedColor} image was not available.`;
+  }
+  return `Reference image shown in ${resolvedImage.resolvedColor || REFERENCE_IMAGE_COLOR} because an exact ${requestedColor} image was not available.`;
+}
+
 function PartImage({ partNumber, color }) {
   const sourcePlan = useMemo(() => getImageSourcePlan(color), [color]);
   const cacheKey = `${partNumber}__${color}`;
@@ -113,37 +133,8 @@ function PartImage({ partNumber, color }) {
     const cached = IMAGE_FALLBACK_CACHE.get(cacheKey) || null;
     setResolvedImage(cached);
     setLoadingFallback(false);
-    setFailed(!cached && IMAGE_FALLBACK_MISS_CACHE.has(cacheKey));
+    setFailed(false);
   }, [cacheKey]);
-
-  async function fetchProxyFallbackForSource(source) {
-    try {
-      const imageUrl = await fetchRebrickableFallbackFromProxy(partNumber, source.color);
-      if (imageUrl) {
-        const resolved = { url: imageUrl, isReference: source.isReference, resolvedColor: source.color };
-        IMAGE_FALLBACK_CACHE.set(cacheKey, resolved);
-        setResolvedImage(resolved);
-        setLoadingFallback(false);
-        setFailed(false);
-        return true;
-      }
-    } catch (_err) {
-      // ignore
-    }
-    return false;
-  }
-
-  async function advanceToNextSourceOrFail(nextSourceIndex) {
-    if (nextSourceIndex < sourcePlan.length) {
-      setSourceIndex(nextSourceIndex);
-      setCandidateIndex(0);
-      setLoadingFallback(false);
-      return;
-    }
-    IMAGE_FALLBACK_MISS_CACHE.add(cacheKey);
-    setLoadingFallback(false);
-    setFailed(true);
-  }
 
   async function fetchCurrentSourceFallback() {
     if (!currentSource) {
@@ -155,31 +146,34 @@ function PartImage({ partNumber, color }) {
       setFailed(false);
       return;
     }
-    if (IMAGE_FALLBACK_MISS_CACHE.has(cacheKey)) {
-      setFailed(true);
+
+    setLoadingFallback(true);
+    const resolved = await fetchRebrickableFallbackFromProxy(partNumber, color);
+    if (resolved?.url) {
+      IMAGE_FALLBACK_CACHE.set(cacheKey, resolved);
+      IMAGE_FALLBACK_MISS_CACHE.delete(cacheKey);
+      setResolvedImage(resolved);
+      setLoadingFallback(false);
+      setFailed(false);
       return;
     }
 
-    setLoadingFallback(true);
-    const found = await fetchProxyFallbackForSource(currentSource);
-    if (found) return;
-    await advanceToNextSourceOrFail(sourceIndex + 1);
+    IMAGE_FALLBACK_MISS_CACHE.add(cacheKey);
+    setLoadingFallback(false);
+    setFailed(true);
   }
 
   useEffect(() => {
     if (!resolvedImage && currentSource && currentCandidates.length === 0) {
       fetchCurrentSourceFallback();
     }
-  }, [cacheKey, resolvedImage, currentSource, currentCandidates.length, sourceIndex]);
+  }, [cacheKey, resolvedImage, currentSource, currentCandidates.length]);
 
-  const badge = (isReference, resolvedColor) => isReference ? (
-    <div className="part-image-badge" title={`Reference image shown in ${resolvedColor}`}>
-      {resolvedColor} ref
-    </div>
-  ) : null;
+  const badgeLabel = getReferenceBadgeLabel(resolvedImage || (currentSource?.isReference ? { isReference: true, resolvedColor: currentSource.color, sourceStep: "bricklink_reference" } : null));
+  const badgeTitle = getReferenceBadgeTitle(resolvedImage || (currentSource?.isReference ? { isReference: true, resolvedColor: currentSource.color, sourceStep: "bricklink_reference" } : null), color);
 
   if (resolvedImage?.url) {
-    return <div className="part-image-frame">{badge(resolvedImage.isReference, resolvedImage.resolvedColor)}<img className="part-image" src={resolvedImage.url} alt={`${partNumber} ${color}`} /></div>;
+    return <div className="part-image-frame">{resolvedImage.isReference ? <div className="part-image-badge" title={badgeTitle}>{badgeLabel}</div> : null}<img className="part-image" src={resolvedImage.url} alt={`${partNumber} ${color}`} /></div>;
   }
 
   if (loadingFallback) {
@@ -190,9 +184,12 @@ function PartImage({ partNumber, color }) {
     return <div className="part-image-frame"><div className="part-image-fallback"><div>No image</div></div></div>;
   }
 
-  return <div className="part-image-frame">{badge(currentSource?.isReference, currentSource?.color)}<img className="part-image" src={currentCandidates[candidateIndex]} alt={`${partNumber} ${color}`} onError={() => {
+  return <div className="part-image-frame">{currentSource?.isReference ? <div className="part-image-badge" title={badgeTitle}>{badgeLabel}</div> : null}<img className="part-image" src={currentCandidates[candidateIndex]} alt={`${partNumber} ${color}`} onError={() => {
     if (candidateIndex < currentCandidates.length - 1) {
       setCandidateIndex(i => i + 1);
+    } else if (sourceIndex < sourcePlan.length - 1) {
+      setSourceIndex(i => i + 1);
+      setCandidateIndex(0);
     } else {
       fetchCurrentSourceFallback();
     }
