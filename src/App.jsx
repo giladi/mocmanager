@@ -23,6 +23,7 @@ const REBRICKABLE_COLOR_ALIASES = {
   "Any Color": "9999"
 };
 const ANY_COLOR_IMAGE_COLOR = "Blue";
+const REFERENCE_IMAGE_COLOR = "Blue";
 
 const IMAGE_FALLBACK_CACHE = new Map();
 const IMAGE_FALLBACK_MISS_CACHE = new Set();
@@ -78,30 +79,79 @@ function imageCandidates(partNumber, color) {
   ];
 }
 
-function getImageDisplayColor(color) {
-  return color === "Any Color" ? ANY_COLOR_IMAGE_COLOR : color;
+function getImageSourcePlan(color) {
+  if (color === "Any Color") {
+    return [{ color: ANY_COLOR_IMAGE_COLOR, isReference: true }];
+  }
+  if (color === REFERENCE_IMAGE_COLOR) {
+    return [{ color, isReference: false }];
+  }
+  return [
+    { color, isReference: false },
+    { color: REFERENCE_IMAGE_COLOR, isReference: true },
+  ];
 }
 
 function PartImage({ partNumber, color }) {
-  const imageColor = useMemo(() => getImageDisplayColor(color), [color]);
-  const candidates = useMemo(() => imageCandidates(partNumber, imageColor), [partNumber, imageColor]);
-  const cacheKey = `${partNumber}__${imageColor}`;
-  const [index, setIndex] = useState(0);
-  const [fallbackUrl, setFallbackUrl] = useState(() => IMAGE_FALLBACK_CACHE.get(cacheKey) || "");
+  const sourcePlan = useMemo(() => getImageSourcePlan(color), [color]);
+  const cacheKey = `${partNumber}__${color}`;
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const [resolvedImage, setResolvedImage] = useState(() => IMAGE_FALLBACK_CACHE.get(cacheKey) || null);
   const [loadingFallback, setLoadingFallback] = useState(false);
-  const [failed, setFailed] = useState(candidates.length === 0 && !IMAGE_FALLBACK_CACHE.has(cacheKey));
+  const [failed, setFailed] = useState(false);
+
+  const currentSource = sourcePlan[sourceIndex] || null;
+  const currentCandidates = useMemo(
+    () => currentSource ? imageCandidates(partNumber, currentSource.color) : [],
+    [partNumber, currentSource]
+  );
 
   useEffect(() => {
-    setIndex(0);
-    const cached = IMAGE_FALLBACK_CACHE.get(cacheKey) || "";
-    setFallbackUrl(cached);
+    setSourceIndex(0);
+    setCandidateIndex(0);
+    const cached = IMAGE_FALLBACK_CACHE.get(cacheKey) || null;
+    setResolvedImage(cached);
     setLoadingFallback(false);
-    setFailed(candidates.length === 0 && !cached);
-  }, [cacheKey, candidates.length]);
+    setFailed(!cached && IMAGE_FALLBACK_MISS_CACHE.has(cacheKey));
+  }, [cacheKey]);
 
-  async function fetchProxyFallback() {
+  async function fetchProxyFallbackForSource(source) {
+    try {
+      const imageUrl = await fetchRebrickableFallbackFromProxy(partNumber, source.color);
+      if (imageUrl) {
+        const resolved = { url: imageUrl, isReference: source.isReference, resolvedColor: source.color };
+        IMAGE_FALLBACK_CACHE.set(cacheKey, resolved);
+        setResolvedImage(resolved);
+        setLoadingFallback(false);
+        setFailed(false);
+        return true;
+      }
+    } catch (_err) {
+      // ignore
+    }
+    return false;
+  }
+
+  async function advanceToNextSourceOrFail(nextSourceIndex) {
+    if (nextSourceIndex < sourcePlan.length) {
+      setSourceIndex(nextSourceIndex);
+      setCandidateIndex(0);
+      setLoadingFallback(false);
+      return;
+    }
+    IMAGE_FALLBACK_MISS_CACHE.add(cacheKey);
+    setLoadingFallback(false);
+    setFailed(true);
+  }
+
+  async function fetchCurrentSourceFallback() {
+    if (!currentSource) {
+      setFailed(true);
+      return;
+    }
     if (IMAGE_FALLBACK_CACHE.has(cacheKey)) {
-      setFallbackUrl(IMAGE_FALLBACK_CACHE.get(cacheKey) || "");
+      setResolvedImage(IMAGE_FALLBACK_CACHE.get(cacheKey) || null);
       setFailed(false);
       return;
     }
@@ -111,32 +161,25 @@ function PartImage({ partNumber, color }) {
     }
 
     setLoadingFallback(true);
-    try {
-      const img = await fetchRebrickableFallbackFromProxy(partNumber, imageColor);
-      if (img) {
-        IMAGE_FALLBACK_CACHE.set(cacheKey, img);
-        setFallbackUrl(img);
-        setLoadingFallback(false);
-        setFailed(false);
-        return;
-      }
-    } catch (_err) {
-      // ignore
-    }
-
-    IMAGE_FALLBACK_MISS_CACHE.add(cacheKey);
-    setLoadingFallback(false);
-    setFailed(true);
+    const found = await fetchProxyFallbackForSource(currentSource);
+    if (found) return;
+    await advanceToNextSourceOrFail(sourceIndex + 1);
   }
 
   useEffect(() => {
-    if (!fallbackUrl && candidates.length === 0) {
-      fetchProxyFallback();
+    if (!resolvedImage && currentSource && currentCandidates.length === 0) {
+      fetchCurrentSourceFallback();
     }
-  }, [cacheKey, fallbackUrl, candidates.length]);
+  }, [cacheKey, resolvedImage, currentSource, currentCandidates.length, sourceIndex]);
 
-  if (fallbackUrl) {
-    return <div className="part-image-frame"><img className="part-image" src={fallbackUrl} alt={`${partNumber} ${color}`} /></div>;
+  const badge = (isReference, resolvedColor) => isReference ? (
+    <div className="part-image-badge" title={`Reference image shown in ${resolvedColor}`}>
+      {resolvedColor} ref
+    </div>
+  ) : null;
+
+  if (resolvedImage?.url) {
+    return <div className="part-image-frame">{badge(resolvedImage.isReference, resolvedImage.resolvedColor)}<img className="part-image" src={resolvedImage.url} alt={`${partNumber} ${color}`} /></div>;
   }
 
   if (loadingFallback) {
@@ -147,11 +190,11 @@ function PartImage({ partNumber, color }) {
     return <div className="part-image-frame"><div className="part-image-fallback"><div>No image</div></div></div>;
   }
 
-  return <div className="part-image-frame"><img className="part-image" src={candidates[index]} alt={`${partNumber} ${color}`} onError={() => {
-    if (index < candidates.length - 1) {
-      setIndex(i => i + 1);
+  return <div className="part-image-frame">{badge(currentSource?.isReference, currentSource?.color)}<img className="part-image" src={currentCandidates[candidateIndex]} alt={`${partNumber} ${color}`} onError={() => {
+    if (candidateIndex < currentCandidates.length - 1) {
+      setCandidateIndex(i => i + 1);
     } else {
-      fetchProxyFallback();
+      fetchCurrentSourceFallback();
     }
   }} /></div>;
 }
@@ -618,7 +661,7 @@ function GuidePanel() {
         </div>
         <div className="guide-section">
           <strong>Images</strong>
-          <p>Part images try BrickLink first and can fall back through the app’s own Cloudflare proxy to Rebrickable when `REBRICKABLE_API_KEY` is configured in Cloudflare. Fallback lookups are cached to improve reliability for repeated views. Parts marked as Any Color may display with a blue reference image for visual consistency; this does not change the stored part color requirement.</p>
+          <p>Part images try BrickLink first and can fall back through the app’s own Cloudflare proxy to Rebrickable when `REBRICKABLE_API_KEY` is configured in Cloudflare. Fallback lookups are cached to improve reliability for repeated views. Parts marked as Any Color may display with a blue reference image for visual consistency, and if an exact-color image cannot be found the app may also fall back to a blue reference image. Reference-color images are marked in the thumbnail and do not change the stored part color requirement.</p>
         </div>
         <div className="guide-section">
           <strong>Notes</strong>
