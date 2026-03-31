@@ -286,3 +286,10 @@ Next:
 - Uses Cloudflare environment variable `REBRICKABLE_API_KEY`
 - Fixes CORS issues and avoids exposing the API key in frontend code
 - Guide page updated to reflect the new image fallback architecture
+
+
+## v39 Any Color image override
+
+- Parts with color `Any Color` now use a blue reference image for thumbnail resolution
+- This is image-only behavior and does not change stored color data, grouping, exports, or search
+- Guide page updated to explain the blue reference image behavior

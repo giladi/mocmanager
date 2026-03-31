@@ -22,6 +22,7 @@ const REBRICKABLE_COLOR_ALIASES = {
   "Metallic Gold": "82",
   "Any Color": "9999"
 };
+const ANY_COLOR_IMAGE_COLOR = "Blue";
 
 const IMAGE_FALLBACK_CACHE = new Map();
 const IMAGE_FALLBACK_MISS_CACHE = new Set();
@@ -77,11 +78,14 @@ function imageCandidates(partNumber, color) {
   ];
 }
 
-
+function getImageDisplayColor(color) {
+  return color === "Any Color" ? ANY_COLOR_IMAGE_COLOR : color;
+}
 
 function PartImage({ partNumber, color }) {
-  const candidates = useMemo(() => imageCandidates(partNumber, color), [partNumber, color]);
-  const cacheKey = `${partNumber}__${color}`;
+  const imageColor = useMemo(() => getImageDisplayColor(color), [color]);
+  const candidates = useMemo(() => imageCandidates(partNumber, imageColor), [partNumber, imageColor]);
+  const cacheKey = `${partNumber}__${imageColor}`;
   const [index, setIndex] = useState(0);
   const [fallbackUrl, setFallbackUrl] = useState(() => IMAGE_FALLBACK_CACHE.get(cacheKey) || "");
   const [loadingFallback, setLoadingFallback] = useState(false);
@@ -108,7 +112,7 @@ function PartImage({ partNumber, color }) {
 
     setLoadingFallback(true);
     try {
-      const img = await fetchRebrickableFallbackFromProxy(partNumber, color);
+      const img = await fetchRebrickableFallbackFromProxy(partNumber, imageColor);
       if (img) {
         IMAGE_FALLBACK_CACHE.set(cacheKey, img);
         setFallbackUrl(img);
@@ -614,7 +618,7 @@ function GuidePanel() {
         </div>
         <div className="guide-section">
           <strong>Images</strong>
-          <p>Part images try BrickLink first and can fall back through the app’s own Cloudflare proxy to Rebrickable when `REBRICKABLE_API_KEY` is configured in Cloudflare. Fallback lookups are cached to improve reliability for repeated views.</p>
+          <p>Part images try BrickLink first and can fall back through the app’s own Cloudflare proxy to Rebrickable when `REBRICKABLE_API_KEY` is configured in Cloudflare. Fallback lookups are cached to improve reliability for repeated views. Parts marked as Any Color may display with a blue reference image for visual consistency; this does not change the stored part color requirement.</p>
         </div>
         <div className="guide-section">
           <strong>Notes</strong>
