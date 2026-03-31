@@ -288,8 +288,9 @@ Next:
 - Guide page updated to reflect the new image fallback architecture
 
 
-## v39 Any Color image override
+## v43 image source expansion
 
-- Parts with color `Any Color` now use a blue reference image for thumbnail resolution
-- This is image-only behavior and does not change stored color data, grouping, exports, or search
-- Guide page updated to explain the blue reference image behavior
+- Added Brick Owl as an additional **server-side** image source behind the existing Cloudflare Pages Function
+- Image requests still do **not** come from the browser
+- New Cloudflare environment variable: `BRICKOWL_API_TOKEN`
+- Rebrickable remains the first API source; Brick Owl is used as an extra fallback when Rebrickable does not return a usable image
